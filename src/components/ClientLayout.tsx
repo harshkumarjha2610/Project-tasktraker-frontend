@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { TaskProvider } from '@/context/TaskContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
-import { Menu, Sun, Moon, Zap } from 'lucide-react';
+import { Menu, Sun, Moon, Zap, Gamepad2 } from 'lucide-react';
 
 function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
-  const isDark = theme === 'dark';
   return (
     <button
       onClick={toggleTheme}
@@ -22,8 +21,10 @@ function ThemeToggle() {
         transition: 'all 0.2s ease',
       }}
     >
-      {isDark ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#7c3aed" />}
-      {isDark ? 'Light' : 'Dark'}
+      {theme === 'dark' && <Sun size={15} color="#f59e0b" />}
+      {theme === 'light' && <Gamepad2 size={15} color="#10b981" />}
+      {theme === 'gaming' && <Moon size={15} color="#7c3aed" />}
+      {theme === 'dark' ? 'Light' : theme === 'light' ? 'Gaming' : 'Dark'}
     </button>
   );
 }

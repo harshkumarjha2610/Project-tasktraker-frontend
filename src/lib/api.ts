@@ -1,7 +1,10 @@
 import { Task, DetailedStats } from '@/types/task';
 
 // ─── Base URL ──────────────────────────────────────────────────
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://project-tasktraker-backend.vercel.app/api' 
+    : 'http://localhost:5000/api');
 
 // ─── Helper ────────────────────────────────────────────────────
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -20,18 +23,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // ─── Map MongoDB _id → id for frontend compatibility ──────────
 function normalizeTask(raw: Record<string, unknown>): Task {
   return {
-    id:                 String(raw._id ?? raw.id),
-    title:              raw.title as string,
-    description:        raw.description as string | undefined,
-    priority:           raw.priority as Task['priority'],
-    status:             raw.status as Task['status'],
-    category:           raw.category as Task['category'],
-    dueDate:            raw.dueDate as string | undefined,
-    createdAt:          (raw.createdAt as string) ?? new Date().toISOString(),
-    completedAt:        raw.completedAt as string | undefined,
-    isDeleted:          raw.isDeleted as boolean | undefined,
-    tags:               (raw.tags as string[]) ?? [],
-    estimatedMinutes:   raw.estimatedMinutes as number | undefined,
+    id: String(raw._id ?? raw.id),
+    title: raw.title as string,
+    description: raw.description as string | undefined,
+    priority: raw.priority as Task['priority'],
+    status: raw.status as Task['status'],
+    category: raw.category as Task['category'],
+    dueDate: raw.dueDate as string | undefined,
+    createdAt: (raw.createdAt as string) ?? new Date().toISOString(),
+    completedAt: raw.completedAt as string | undefined,
+    isDeleted: raw.isDeleted as boolean | undefined,
+    tags: (raw.tags as string[]) ?? [],
+    estimatedMinutes: raw.estimatedMinutes as number | undefined,
   };
 }
 
@@ -42,8 +45,8 @@ export async function getTasks(params?: {
 }): Promise<Task[]> {
   const qs = params
     ? '?' + new URLSearchParams(
-        Object.entries(params).filter(([, v]) => v && v !== 'all') as [string, string][]
-      ).toString()
+      Object.entries(params).filter(([, v]) => v && v !== 'all') as [string, string][]
+    ).toString()
     : '';
 
   const res = await request<{ data: Record<string, unknown>[] }>(`/tasks${qs}`);

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CheckSquare, BarChart3, Tag, Settings,
-  Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen,
+  Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen, Gamepad2,
 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -168,13 +168,13 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }: 
             fontSize: 13, fontWeight: 500, fontFamily: 'Inter, sans-serif',
             transition: 'all 0.2s ease', width: '100%',
           }}
-          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          title="Toggle Theme"
         >
-          {isDark
-            ? <Sun size={16} color="#f59e0b" style={{ flexShrink: 0 }} />
-            : <Moon size={16} color="#7c3aed" style={{ flexShrink: 0 }} />}
+          {theme === 'dark' && <Sun size={16} color="#f59e0b" style={{ flexShrink: 0 }} />}
+          {theme === 'light' && <Gamepad2 size={16} color="#10b981" style={{ flexShrink: 0 }} />}
+          {theme === 'gaming' && <Moon size={16} color="#7c3aed" style={{ flexShrink: 0 }} />}
           <span className="sidebar-footer-text">
-            {isDark ? 'Light Mode' : 'Dark Mode'}
+            {theme === 'dark' ? 'Light Mode' : theme === 'light' ? 'Gaming Theme' : 'Dark Mode'}
           </span>
         </button>
 

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-type Theme = 'dark' | 'light';
+type Theme = 'dark' | 'light' | 'gaming';
 
 interface ThemeContextValue {
   theme: Theme;
@@ -24,7 +24,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = () => {
     setTheme(prev => {
-      const next: Theme = prev === 'dark' ? 'light' : 'dark';
+      let next: Theme = 'dark';
+      if (prev === 'dark') next = 'light';
+      else if (prev === 'light') next = 'gaming';
+      
       localStorage.setItem('dt_theme', next);
       document.documentElement.setAttribute('data-theme', next);
       return next;

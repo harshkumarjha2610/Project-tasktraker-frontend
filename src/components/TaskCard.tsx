@@ -7,15 +7,15 @@ import { useState } from 'react';
 
 const PRIORITY_MAP: Record<Priority, { cls: string; label: string }> = {
   'super high': { cls: 'badge-super-high', label: '🔥 Super High' },
-  high:   { cls: 'badge-high',   label: '🟠 High' },
+  high: { cls: 'badge-high', label: '🟠 High' },
   medium: { cls: 'badge-medium', label: '🟡 Med' },
-  low:    { cls: 'badge-low',    label: '🟢 Low' },
+  low: { cls: 'badge-low', label: '🟢 Low' },
 };
 
 const STATUS_MAP: Record<Status, { cls: string; label: string }> = {
-  todo:       { cls: 'badge-todo',       label: 'Todo' },
+  todo: { cls: 'badge-todo', label: 'Todo' },
   inprogress: { cls: 'badge-inprogress', label: 'Active' },
-  done:       { cls: 'badge-done',       label: 'Done' },
+  done: { cls: 'badge-done', label: 'Done' },
 };
 
 const CATEGORY_COLORS: Record<Category, string> = {
@@ -32,17 +32,25 @@ interface TaskCardProps {
 export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isDone = task.status === 'done';
-  
+
+  const PRIORITY_COLORS: Record<Priority, string> = {
+    'super high': '#ff0000',
+    high: '#ea580c',
+    medium: '#ca8a04',
+    low: '#16a34a',
+  };
+  const pColor = PRIORITY_COLORS[task.priority];
+
   const now = new Date();
   const created = new Date(task.createdAt);
-  
+
   let hoursLeft: number | null = null;
   let progressPercent = 0;
   let isOverdue = false;
 
   if (task.dueDate && !isDone) {
     const due = new Date(task.dueDate);
-    
+
     const msLeft = due.getTime() - now.getTime();
     if (msLeft < 0) {
       isOverdue = true;
@@ -79,8 +87,8 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
           onClick={() => !task.isDeleted && onToggle(task.id)}
           style={{
             width: 20, height: 20, borderRadius: 6,
-            border: `2px solid ${isDone ? 'var(--accent)' : 'var(--border)'}`,
-            background: isDone ? 'var(--accent)' : 'transparent',
+            border: `2px solid ${isDone ? pColor : 'var(--border)'}`,
+            background: isDone ? pColor : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: task.isDeleted ? 'not-allowed' : 'pointer', flexShrink: 0,
             transition: 'all 0.2s', opacity: task.isDeleted ? 0.5 : 1,
@@ -140,7 +148,11 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
           {/* Tags */}
           {task.tags && task.tags.length > 0 && (
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
-              {task.tags.map(t => <span key={t} className="tag">{t}</span>)}
+              {task.tags.map(t => (
+                <span key={t} className="tag" style={{ color: pColor, background: `${pColor}15`, borderColor: `${pColor}30` }}>
+                  {t}
+                </span>
+              ))}
             </div>
           )}
 
@@ -154,12 +166,13 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
                 </span>
               </div>
               <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ 
-                  height: '100%', 
-                  background: isOverdue ? '#dc2626' : (progressPercent > 85 ? '#f59e0b' : 'linear-gradient(90deg, #8b5cf6, #06b6d4)'), 
+                <div style={{
+                  height: '100%',
+                  background: isOverdue ? '#dc2626' : pColor,
                   width: `${progressPercent}%`,
                   transition: 'width 0.5s ease',
-                  borderRadius: 4
+                  borderRadius: 4,
+                  boxShadow: `0 0 10px ${pColor}80`
                 }} />
               </div>
             </div>
@@ -177,7 +190,7 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
             </button>
             <button
               onClick={() => onDelete(task.id)}
-              style={{ padding: 6, background: 'var(--bg-card)', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#ef4444' }}
+              style={{ padding: 6, background: 'rgba(239, 68, 68, 0.1)', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#ef4444' }}
             >
               <Trash2 size={13} />
             </button>
@@ -197,7 +210,7 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
       {expanded && task.description && (
         <div style={{
           marginTop: 10, padding: '10px 12px', borderRadius: 9,
-          background: 'var(--bg-card-hover)', border: '1px solid var(--border)',
+          background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.05)',
           fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6,
         }}>
           {task.description}

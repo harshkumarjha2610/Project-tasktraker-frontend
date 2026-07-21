@@ -12,23 +12,23 @@ interface TaskModalProps {
 
 const PRIORITIES: { value: Priority; label: string; color: string }[] = [
   { value: 'super high', label: '🔥 Super High', color: '#ff0000' },
-  { value: 'high',   label: '🟠 High',   color: '#ea580c' },
+  { value: 'high', label: '🟠 High', color: '#ea580c' },
   { value: 'medium', label: '🟡 Medium', color: '#ca8a04' },
-  { value: 'low',    label: '🟢 Low',    color: '#16a34a' },
+  { value: 'low', label: '🟢 Low', color: '#16a34a' },
 ];
 
 const CATEGORIES: { value: Category; label: string; emoji: string }[] = [
-  { value: 'work',     label: 'Work',     emoji: '💼' },
+  { value: 'work', label: 'Work', emoji: '💼' },
   { value: 'personal', label: 'Personal', emoji: '👤' },
-  { value: 'health',   label: 'Health',   emoji: '❤️' },
+  { value: 'health', label: 'Health', emoji: '❤️' },
   { value: 'learning', label: 'Learning', emoji: '📚' },
-  { value: 'other',    label: 'Other',    emoji: '📌' },
+  { value: 'other', label: 'Other', emoji: '📌' },
 ];
 
 export default function TaskModal({ task, onSave, onClose }: TaskModalProps) {
   const isEdit = !!task;
 
-  const [title, setTitle]       = useState(task?.title ?? '');
+  const [title, setTitle] = useState(task?.title ?? '');
   const [priority, setPriority] = useState<Priority>(task?.priority ?? 'medium');
   const [category, setCategory] = useState<Category>(task?.category ?? 'work');
 
@@ -43,7 +43,7 @@ export default function TaskModal({ task, onSave, onClose }: TaskModalProps) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T23:59`;
   };
 
-  const [dueDate, setDueDate]   = useState(getInitialDateTime());
+  const [dueDate, setDueDate] = useState(getInitialDateTime());
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
