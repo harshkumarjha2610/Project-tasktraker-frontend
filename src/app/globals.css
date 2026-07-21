@@ -803,3 +803,9 @@ html[data-theme="gaming"] body {
   background: #33cc33;
   border-color: #007700 !important;
 }
+
+/* Completed tasks in gaming theme get white text for visibility */
+[data-theme="gaming"] .task-row.completed,
+[data-theme="gaming"] .task-row.completed * {
+  color: #ffffff !important;
+}
