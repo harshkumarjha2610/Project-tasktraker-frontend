@@ -9,16 +9,18 @@ interface ThemeContextValue {
   toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue>({ theme: 'dark', toggleTheme: () => {} });
+const ThemeContext = createContext<ThemeContextValue>({ theme: 'gaming', toggleTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('gaming');
 
   useEffect(() => {
     const saved = localStorage.getItem('dt_theme') as Theme | null;
     if (saved) {
       setTheme(saved);
       document.documentElement.setAttribute('data-theme', saved);
+    } else {
+      document.documentElement.setAttribute('data-theme', 'gaming');
     }
   }, []);
 

@@ -68,13 +68,23 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
   if (isDone && task.completedAt && task.dueDate) {
     const compDate = new Date(task.completedAt);
     const dueDate = new Date(task.dueDate);
-    const timeDiffHours = (dueDate.getTime() - compDate.getTime()) / (1000 * 60 * 60);
-    if (timeDiffHours >= 4) {
-      completionStatus = { label: '⚡ Before Time', color: '#3b82f6', bg: '#3b82f620' };
-    } else if (timeDiffHours < 0) {
-      completionStatus = { label: '⚠ After Time', color: '#f59e0b', bg: '#f59e0b20' };
+    const diffMs = dueDate.getTime() - compDate.getTime();
+    
+    const absDiffMs = Math.abs(diffMs);
+    const diffHours = Math.floor(absDiffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((absDiffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    let timeStr = '';
+    if (diffHours > 0) timeStr += `${diffHours}h `;
+    if (diffMins > 0 || diffHours === 0) timeStr += `${diffMins}m `;
+    timeStr = timeStr.trim();
+
+    if (diffMs >= 4 * 60 * 60 * 1000) {
+      completionStatus = { label: `⚡ ${timeStr} Before Time`, color: '#3b82f6', bg: '#3b82f620' };
+    } else if (diffMs < 0) {
+      completionStatus = { label: `⚠ ${timeStr} After Time`, color: '#f59e0b', bg: '#f59e0b20' };
     } else {
-      completionStatus = { label: '✓ On Time', color: '#10b981', bg: '#10b98120' };
+      completionStatus = { label: `✓ On Time (${timeStr} early)`, color: '#10b981', bg: '#10b98120' };
     }
   }
 
