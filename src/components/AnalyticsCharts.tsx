@@ -3,7 +3,7 @@
 import { useTaskContext } from '@/context/TaskContext';
 import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
-import { TrendingUp, Target, Flame, Clock, CheckCircle2, AlertTriangle, AlertCircle, Trash2 } from 'lucide-react';
+import { TrendingUp, Target, Flame, Clock, CheckCircle2, AlertTriangle, AlertCircle, Trash2, Hourglass, History } from 'lucide-react';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 const CATEGORY_COLORS: Record<string, string> = {
@@ -71,6 +71,8 @@ export default function AnalyticsCharts() {
           { icon: Zap, label: 'Before Time', value: stats.completedBeforeTime, color: '#3b82f6' },
           { icon: AlertTriangle, label: 'After Time', value: stats.completedAfterTime, color: '#f59e0b' },
           { icon: Trash2, label: 'Deleted Incomplete', value: stats.deletedWithoutCompletion, color: '#ef4444' },
+          { icon: Hourglass, label: 'Time Saved', value: `${stats.totalTimeSaved || 0}h`, color: '#8b5cf6' },
+          { icon: History, label: 'Time Wasted', value: `${stats.totalTimeWasted || 0}h`, color: '#f43f5e' },
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className="stat-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

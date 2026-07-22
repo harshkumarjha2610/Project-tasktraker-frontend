@@ -1,4 +1,5 @@
 import { Task, DetailedStats } from '@/types/task';
+import { Note } from '@/types/note';
 
 // ─── Base URL ──────────────────────────────────────────────────
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 
@@ -84,4 +85,42 @@ export async function deleteTask(id: string): Promise<void> {
 export async function getStats(): Promise<DetailedStats> {
   const res = await request<{ data: DetailedStats }>('/tasks/stats');
   return res.data;
+}
+
+// ─── Map MongoDB _id → id for Notes ───────────────────────────
+function normalizeNote(raw: Record<string, unknown>): Note {
+  return {
+    id: String(raw._id ?? raw.id),
+    title: raw.title as string,
+    content: raw.content as string,
+    color: raw.color as string,
+    createdAt: raw.createdAt as string,
+    updatedAt: raw.updatedAt as string,
+  };
+}
+
+// ─── Notes API ─────────────────────────────────────────────────
+export async function getNotes(): Promise<Note[]> {
+  const res = await request<{ data: Record<string, unknown>[] }>('/notes');
+  return res.data.map(normalizeNote);
+}
+
+export async function createNote(payload: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>): Promise<Note> {
+  const res = await request<{ data: Record<string, unknown> }>('/notes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return normalizeNote(res.data);
+}
+
+export async function updateNote(id: string, updates: Partial<Note>): Promise<Note> {
+  const res = await request<{ data: Record<string, unknown> }>(`/notes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+  return normalizeNote(res.data);
+}
+
+export async function deleteNote(id: string): Promise<void> {
+  await request(`/notes/${id}`, { method: 'DELETE' });
 }

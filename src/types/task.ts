@@ -27,6 +27,8 @@ export interface DetailedStats {
   completedOnTime: number;
   completedBeforeTime: number;
   completedAfterTime: number;
+  totalTimeSaved: number;
+  totalTimeWasted: number;
   deletedWithoutCompletion: number;
   byPriority: Record<string, number>;
   byCategory: Record<string, number>;
