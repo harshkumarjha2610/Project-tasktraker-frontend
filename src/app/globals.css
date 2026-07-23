@@ -798,6 +798,57 @@ html[data-theme="gaming"] body {
   border-color: #0044aa !important;
 }
 
+/* ─── Checkbox Tick Box Animation ───────────────────────────── */
+@keyframes checkPop {
+  0% {
+    transform: scale(0.5) rotate(-15deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.3) rotate(5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes checkRingPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes drawSvgCheck {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.checkbox-animate-check {
+  animation: checkPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.checkbox-animate-ring {
+  animation: checkRingPulse 0.5s ease-out forwards;
+}
+
+.checkbox-svg-draw {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: drawSvgCheck 0.3s ease-out 0.05s forwards;
+}
+
 /* Low (Green) */
 [data-theme="gaming"] .task-row.priority-low {
   background: #33cc33;

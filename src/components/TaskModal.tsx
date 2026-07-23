@@ -28,7 +28,13 @@ const CATEGORIES: { value: Category; label: string; emoji: string }[] = [
 export default function TaskModal({ task, onSave, onClose }: TaskModalProps) {
   const isEdit = !!task;
 
-  const [title, setTitle] = useState(task?.title ?? '');
+  const capitalizeFirst = (str: string) => {
+    if (!str) return str;
+    const trimmed = str.trimStart();
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  };
+
+  const [title, setTitle] = useState(task?.title ? capitalizeFirst(task.title) : '');
   const [priority, setPriority] = useState<Priority>(task?.priority ?? 'medium');
   const [category, setCategory] = useState<Category>(task?.category ?? 'work');
 
@@ -45,11 +51,16 @@ export default function TaskModal({ task, onSave, onClose }: TaskModalProps) {
 
   const [dueDate, setDueDate] = useState(getInitialDateTime());
 
+  const handleTitleChange = (val: string) => {
+    setTitle(capitalizeFirst(val));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    const finalTitle = capitalizeFirst(title.trim());
+    if (!finalTitle) return;
     onSave({
-      title: title.trim(),
+      title: finalTitle,
       priority,
       category,
       status: task?.status ?? 'todo',
@@ -78,10 +89,11 @@ export default function TaskModal({ task, onSave, onClose }: TaskModalProps) {
             <input
               className="input"
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => handleTitleChange(e.target.value)}
               placeholder="e.g. Review project proposal"
               required
               autoFocus
+              autoCapitalize="sentences"
               style={{ fontSize: 15 }}
             />
           </div>

@@ -66,19 +66,24 @@ interface NoteTab {
 }
 
 const COLORS = [
-  { value: 'default', label: 'Default', hex: 'var(--bg-card)' },
-  { value: 'red', label: 'Red', hex: '#fff5f5' },
-  { value: 'blue', label: 'Blue', hex: '#f0f9ff' },
-  { value: 'green', label: 'Green', hex: '#f0fdf4' },
-  { value: 'yellow', label: 'Yellow', hex: '#fffbeb' },
+  { value: 'paper', label: 'Paper Notebook', hex: '#fcfaf2', accent: '#d97706' },
+  { value: 'white', label: 'Pure White', hex: '#ffffff', accent: '#475569' },
+  { value: 'dark', label: 'Dark Midnight', hex: '#14141e', accent: '#8b5cf6' },
+  { value: 'red', label: 'Red', hex: '#251216', accent: '#ef4444' },
+  { value: 'blue', label: 'Blue', hex: '#0f1a2e', accent: '#3b82f6' },
+  { value: 'green', label: 'Green', hex: '#0d2218', accent: '#10b981' },
+  { value: 'yellow', label: 'Yellow', hex: '#261b0c', accent: '#f59e0b' },
 ];
 
 const TEXT_COLOR_MAP: Record<string, string> = {
-  default: 'var(--text-primary)',
-  red: '#7f1d1d',
-  blue: '#1e3a8a',
-  green: '#14532d',
-  yellow: '#713f12',
+  paper: '#1a1a24',
+  white: '#0f172a',
+  dark: '#ffffff',
+  default: '#1a1a24',
+  red: '#ffffff',
+  blue: '#ffffff',
+  green: '#ffffff',
+  yellow: '#ffffff',
 };
 
 // Toolbar Component for TipTap
@@ -111,7 +116,7 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
   };
 
   return (
-    <div style={{ display: 'flex', gap: 2, padding: '4px 60px', backgroundColor: 'rgba(255,255,255,0.02)', overflowX: 'auto', flexShrink: 0 }}>
+    <div style={{ display: 'flex', gap: 2, padding: '6px 32px', backgroundColor: 'rgba(255,255,255,0.02)', overflowX: 'auto', flexShrink: 0 }}>
       <button type="button" onClick={handleDecreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 13, width: 24}} title="Decrease font size">A-</button>
       <button type="button" onClick={handleIncreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 15, width: 24}} title="Increase font size">A+</button>
       <div style={{ width: 1, background: `${color}20`, margin: '0 6px' }} />
@@ -131,7 +136,7 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
 
 export default function NoteModal({ open, onClose, onSave, initialData }: NoteModalProps) {
   const [title, setTitle] = useState('');
-  const [color, setColor] = useState('default');
+  const [color, setColor] = useState('paper');
   const [isMaximized, setIsMaximized] = useState(false);
   const [tabs, setTabs] = useState<NoteTab[]>([{ id: '1', name: 'Main', content: '' }]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
@@ -154,7 +159,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
     if (open) {
       if (initialData) {
         setTitle(initialData.title || '');
-        setColor(initialData.color || 'default');
+        setColor(initialData.color && initialData.color !== 'default' ? initialData.color : 'paper');
         
         // Parse tabs from content if it's JSON, else treat as a single tab
         try {
@@ -174,7 +179,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
         }
       } else {
         setTitle('');
-        setColor('default');
+        setColor('paper');
         setTabs([{ id: '1', name: 'Main', content: '' }]);
         setActiveTabId('1');
         editor?.commands.setContent('');
@@ -297,31 +302,14 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           display: 'flex', 
           flexDirection: 'column',
           backgroundColor: bgHex,
-          backgroundImage: color !== 'default' 
-            ? `repeating-linear-gradient(transparent, transparent ${lineSpacing - 1}px, ${textColor}15 ${lineSpacing - 1}px, ${textColor}15 ${lineSpacing}px)`
-            : 'none',
-          backgroundPosition: `0 92px`, // Align notebook lines
           borderRadius: isMaximized ? 0 : 20, 
-          boxShadow: isMaximized ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+          boxShadow: isMaximized ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
           overflow: 'hidden',
           transition: 'border-radius 0.3s ease, box-shadow 0.3s ease',
           position: 'relative',
           resize: isMaximized ? 'none' : 'both',
         }}
       >
-        {/* Red Notebook Margin Line */}
-        {color !== 'default' && (
-          <div style={{
-            position: 'absolute',
-            left: '80px',
-            top: 0,
-            bottom: 0,
-            width: '2px',
-            backgroundColor: '#ef444430',
-            zIndex: 0,
-            pointerEvents: 'none'
-          }} />
-        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', zIndex: 1 }}>
           
@@ -379,12 +367,12 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
                     onClick={() => setColor(c.value)}
                     style={{
                       width: 24, height: 24, borderRadius: '50%',
-                      background: c.value === 'default' ? 'var(--bg-card-hover)' : c.hex,
+                      background: c.accent,
                       border: color === c.value ? `2px solid ${textColor}` : '2px solid transparent',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                       cursor: 'pointer',
                       transition: 'transform 0.2s',
-                      transform: color === c.value ? 'scale(1.1)' : 'scale(1)'
+                      transform: color === c.value ? 'scale(1.15)' : 'scale(1)'
                     }}
                     title={c.label}
                   />
@@ -410,7 +398,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            padding: '0 60px',
+            padding: '0 32px',
             gap: 8,
             overflowX: 'auto',
             borderBottom: isDefault ? '1px solid var(--border)' : `1px solid ${textColor}15`,
@@ -489,39 +477,54 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           </div>
           
           <style dangerouslySetInnerHTML={{__html: `
-            .tiptap-editor { outline: none; min-height: 100%; font-size: 18px; line-height: ${lineSpacing}px; color: ${textColor}; padding-top: 5px; cursor: text; white-space: pre-wrap; }
-            .tiptap-editor p { margin: 0; }
-            .tiptap-editor h1, .tiptap-editor h2 { line-height: ${lineSpacing * 2}px; margin: 0; }
-            .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; }
-            .tiptap-editor li { margin: 0; }
+            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 1.6; color: ${textColor}; padding-top: 5px; cursor: text; white-space: pre-wrap; }
+            .tiptap-editor p { margin: 0 0 12px 0; }
+            .tiptap-editor h1, .tiptap-editor h2 { margin: 16px 0 8px 0; font-weight: 700; }
+            .tiptap-editor ul, .tiptap-editor ol { margin: 0 0 12px 0; padding-left: 24px; }
+            .tiptap-editor li { margin: 4px 0; }
             .tiptap-editor mark { background-color: rgba(250, 204, 21, 0.4); color: inherit; padding: 2px 4px; border-radius: 4px; }
-            .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}80; float: left; height: 0; pointer-events: none; }
+            .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 0; pointer-events: none; }
           `}} />
 
           {/* Editor Area */}
           <div style={{ 
-            flex: 1, display: 'flex', flexDirection: 'column', 
-            padding: '20px 60px 40px 100px', gap: 16, overflowY: 'auto' 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            position: 'relative',
+            padding: color === 'paper' ? '24px 32px 32px 92px' : '24px 32px 32px 32px', 
+            gap: 16, 
+            overflowY: 'auto',
+            backgroundImage: color === 'paper' 
+              ? 'repeating-linear-gradient(transparent, transparent 31px, rgba(59, 130, 246, 0.15) 31px, rgba(59, 130, 246, 0.15) 32px)'
+              : 'none',
+            backgroundPosition: '0 0',
           }}>
-            <input 
-              ref={titleRef}
-              value={title} 
-              onChange={(e) => setTitle(e.target.value)} 
-              placeholder="Note Title..." 
-              style={{
-                fontSize: 42, 
-                fontWeight: 800, 
-                border: 'none', 
-                background: 'transparent',
-                outline: 'none', 
-                color: textColor, 
-                width: '100%',
-                padding: 0,
-                letterSpacing: '-1px',
-                flexShrink: 0
-              }}
-            />
-            
+            {/* Double Red Notebook Margin Lines starting below toolbar & tabs */}
+            {color === 'paper' && (
+              <>
+                <div style={{
+                  position: 'absolute',
+                  left: '68px',
+                  top: 0,
+                  bottom: 0,
+                  width: '1.5px',
+                  backgroundColor: '#ef444499',
+                  zIndex: 2,
+                  pointerEvents: 'none'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  left: '73px',
+                  top: 0,
+                  bottom: 0,
+                  width: '1.5px',
+                  backgroundColor: '#ef444499',
+                  zIndex: 2,
+                  pointerEvents: 'none'
+                }} />
+              </>
+            )}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <EditorContent editor={editor} style={{ flex: 1, display: 'flex', flexDirection: 'column' }} />
             </div>

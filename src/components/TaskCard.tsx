@@ -92,19 +92,37 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
     <div className={`task-row priority-${task.priority.replace(' ', '-')} ${isDone ? 'completed' : ''}`} style={{ flexDirection: 'column' }}>
       {/* Main row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%' }}>
-        {/* Status Checkbox */}
+        {/* Status Checkbox with Animated Tick */}
         <button
           onClick={() => !task.isDeleted && onToggle(task.id)}
+          className={isDone ? 'checkbox-animate-ring' : ''}
           style={{
-            width: 20, height: 20, borderRadius: 6,
+            width: 22, height: 22, borderRadius: 7,
             border: `2px solid ${isDone ? pColor : 'var(--border)'}`,
             background: isDone ? pColor : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: task.isDeleted ? 'not-allowed' : 'pointer', flexShrink: 0,
-            transition: 'all 0.2s', opacity: task.isDeleted ? 0.5 : 1,
+            transition: 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)', 
+            opacity: task.isDeleted ? 0.5 : 1,
+            transform: isDone ? 'scale(1.05)' : 'scale(1)',
+            boxShadow: isDone ? `0 0 10px ${pColor}60` : 'none',
           }}
         >
-          {isDone && <Check size={14} color="#fff" strokeWidth={3} />}
+          {isDone && (
+            <svg 
+              width="14" 
+              height="14" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="#fff" 
+              strokeWidth="3.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="checkbox-animate-check"
+            >
+              <polyline points="20 6 9 17 4 12" className="checkbox-svg-draw" />
+            </svg>
+          )}
         </button>
 
         {/* Content */}

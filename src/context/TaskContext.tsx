@@ -70,8 +70,18 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     refetch();
   }, [refetch]);
 
+  const capFirst = (str?: string) => {
+    if (!str) return str;
+    const trimmed = str.trimStart();
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  };
+
   const addTask = async (payload: Omit<Task, 'id' | 'createdAt'>) => {
-    const task = await createTask(payload);
+    const formattedPayload = {
+      ...payload,
+      title: capFirst(payload.title) || payload.title,
+    };
+    const task = await createTask(formattedPayload);
     setTasks(prev => [task, ...prev]);
   };
 
@@ -80,7 +90,11 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       console.warn('[TaskContext] editTask: invalid id skipped:', id);
       return;
     }
-    const updated = await updateTask(id, updates);
+    const formattedUpdates = {
+      ...updates,
+      ...(updates.title ? { title: capFirst(updates.title) } : {}),
+    };
+    const updated = await updateTask(id, formattedUpdates);
     setTasks(prev => prev.map(t => t.id === id ? updated : t));
   };
 
