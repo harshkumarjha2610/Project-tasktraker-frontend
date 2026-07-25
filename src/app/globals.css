@@ -190,6 +190,12 @@ body {
   animation: blinkWarningSlow 2s infinite ease-in-out;
 }
 
+/* Disable blinking animations when task is completed */
+.task-row.completed .badge-super-high,
+.task-row.completed .badge-high {
+  animation: none !important;
+}
+
 .badge-medium {
   background: rgba(202, 138, 4, 0.12);
   color: #ca8a04;

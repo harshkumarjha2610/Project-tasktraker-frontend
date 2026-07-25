@@ -1,11 +1,12 @@
 'use client';
 
 import { useTaskContext } from '@/context/TaskContext';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import TaskCard from '@/components/TaskCard';
 import TaskModal from '@/components/TaskModal';
 import { Task } from '@/types/task';
-import { Plus, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Plus, Search, SlidersHorizontal, X, Calendar, CheckCircle2, History } from 'lucide-react';
+import { format, isToday, isYesterday } from 'date-fns';
 
 export default function TasksPage() {
   const {
@@ -20,22 +21,59 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = useState<'active' | 'history'>('active');
 
   const now = new Date();
-  const displayTasks = filteredTasks.filter(task => {
-    if (viewMode === 'history') {
-      return task.status === 'done';
-    } else {
-      // 'active' view: hide deleted tasks completely
-      if (task.isDeleted) return false;
-      
-      // hide done tasks completed > 5 hours ago
-      if (task.status === 'done' && task.completedAt) {
-        const compDate = new Date(task.completedAt);
-        const hours = (now.getTime() - compDate.getTime()) / (1000 * 60 * 60);
-        return hours <= 5;
+
+  // Filter tasks based on active / history mode
+  const displayTasks = useMemo(() => {
+    return filteredTasks.filter(task => {
+      if (viewMode === 'history') {
+        return task.status === 'done';
+      } else {
+        if (task.isDeleted) return false;
+        // Hide done tasks completed > 5 hours ago from active view
+        if (task.status === 'done' && task.completedAt) {
+          const compDate = new Date(task.completedAt);
+          const hours = (now.getTime() - compDate.getTime()) / (1000 * 60 * 60);
+          return hours <= 5;
+        }
+        return true;
       }
-      return true; // show todo/inprogress, and recently done
-    }
-  });
+    });
+  }, [filteredTasks, viewMode]);
+
+  // Group completed tasks day-wise for History View
+  const groupedHistory = useMemo(() => {
+    if (viewMode !== 'history') return [];
+
+    const groups: { [dateKey: string]: { dateKey: string; dateLabel: string; tasks: Task[] } } = {};
+
+    displayTasks.forEach(task => {
+      const timestamp = task.completedAt || task.createdAt || new Date().toISOString();
+      const dateObj = new Date(timestamp);
+      const dateKey = format(dateObj, 'yyyy-MM-dd');
+
+      if (!groups[dateKey]) {
+        let dateLabel = format(dateObj, 'EEEE, MMMM d, yyyy');
+        if (isToday(dateObj)) {
+          dateLabel = `Today — ${format(dateObj, 'EEEE, MMM d')}`;
+        } else if (isYesterday(dateObj)) {
+          dateLabel = `Yesterday — ${format(dateObj, 'EEEE, MMM d')}`;
+        }
+
+        groups[dateKey] = {
+          dateKey,
+          dateLabel,
+          tasks: [],
+        };
+      }
+
+      groups[dateKey].tasks.push(task);
+    });
+
+    // Sort dates descending (latest day first)
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map(key => groups[key]);
+  }, [displayTasks, viewMode]);
 
   const hasActiveFilter = filterStatus !== 'all' || filterPriority !== 'all' || filterCategory !== 'all';
 
@@ -63,7 +101,7 @@ export default function TasksPage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <h1 style={{ fontSize: 'clamp(18px, 4vw, 24px)', fontWeight: 800 }}>
-              {viewMode === 'history' ? 'History' : 'All Tasks'}
+              {viewMode === 'history' ? 'Task History' : 'All Tasks'}
             </h1>
             <div style={{ display: 'flex', background: 'var(--bg-card)', padding: 3, borderRadius: 8, border: '1px solid var(--border)' }}>
               <button
@@ -83,7 +121,9 @@ export default function TasksPage() {
             </div>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 6 }}>
-            {displayTasks.length} task{displayTasks.length !== 1 ? 's' : ''}
+            {viewMode === 'history' 
+              ? `${displayTasks.length} completed task${displayTasks.length !== 1 ? 's' : ''} across ${groupedHistory.length} day${groupedHistory.length !== 1 ? 's' : ''}`
+              : `${displayTasks.length} task${displayTasks.length !== 1 ? 's' : ''}`}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -181,33 +221,103 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* Task list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {displayTasks.length === 0 ? (
-          <div style={{
-            padding: '52px 24px', textAlign: 'center',
-            borderRadius: 14, border: '2px dashed var(--border)',
-            color: 'var(--text-muted)',
-          }}>
-            <div style={{ fontSize: 36, marginBottom: 10 }}>📭</div>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 5, color: 'var(--text-secondary)' }}>
-              No tasks found
+      {/* Task List / Day-Wise History View */}
+      {viewMode === 'history' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {groupedHistory.length === 0 ? (
+            <div style={{
+              padding: '52px 24px', textAlign: 'center',
+              borderRadius: 14, border: '2px dashed var(--border)',
+              color: 'var(--text-muted)',
+            }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📜</div>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 5, color: 'var(--text-secondary)' }}>
+                No task history found
+              </div>
+              <div style={{ fontSize: 13 }}>
+                {hasActiveFilter ? 'Try clearing filters' : 'Completed tasks will be grouped here day by day'}
+              </div>
             </div>
-            <div style={{ fontSize: 13 }}>
-              {hasActiveFilter ? 'Try clearing filters' : viewMode === 'history' ? 'You have no completed tasks yet' : 'Create your first task!'}
+          ) : (
+            groupedHistory.map((group) => (
+              <div key={group.dateKey} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* Sticky Day Header */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 16px',
+                  borderRadius: 12,
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Calendar size={16} style={{ color: 'var(--accent)' }} />
+                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                      {group.dateLabel}
+                    </h3>
+                  </div>
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: '3px 10px',
+                    borderRadius: 12,
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}>
+                    <CheckCircle2 size={13} />
+                    {group.tasks.length} {group.tasks.length === 1 ? 'completed' : 'completed'}
+                  </span>
+                </div>
+
+                {/* Day Tasks */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingLeft: 4 }}>
+                  {group.tasks.map(task => (
+                    <TaskCard
+                      key={task.id} task={task}
+                      onToggle={toggleComplete}
+                      onEdit={t => { setEditingTask(t); setShowModal(true); }}
+                      onDelete={removeTask}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        /* Active Tasks View */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {displayTasks.length === 0 ? (
+            <div style={{
+              padding: '52px 24px', textAlign: 'center',
+              borderRadius: 14, border: '2px dashed var(--border)',
+              color: 'var(--text-muted)',
+            }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📭</div>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 5, color: 'var(--text-secondary)' }}>
+                No active tasks found
+              </div>
+              <div style={{ fontSize: 13 }}>
+                {hasActiveFilter ? 'Try clearing filters' : 'Create your first task!'}
+              </div>
             </div>
-          </div>
-        ) : (
-          displayTasks.map(task => (
-            <TaskCard
-              key={task.id} task={task}
-              onToggle={toggleComplete}
-              onEdit={t => { setEditingTask(t); setShowModal(true); }}
-              onDelete={removeTask}
-            />
-          ))
-        )}
-      </div>
+          ) : (
+            displayTasks.map(task => (
+              <TaskCard
+                key={task.id} task={task}
+                onToggle={toggleComplete}
+                onEdit={t => { setEditingTask(t); setShowModal(true); }}
+                onDelete={removeTask}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       {/* Floating add button on mobile */}
       <button

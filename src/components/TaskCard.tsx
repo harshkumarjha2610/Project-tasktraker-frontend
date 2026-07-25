@@ -47,6 +47,7 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
   let hoursLeft: number | null = null;
   let progressPercent = 0;
   let isOverdue = false;
+  let overdueDurationText = '';
 
   if (task.dueDate && !isDone) {
     const due = new Date(task.dueDate);
@@ -56,6 +57,20 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
       isOverdue = true;
       hoursLeft = null;
       progressPercent = 100;
+
+      const diffMs = Math.abs(msLeft);
+      const totalMins = Math.floor(diffMs / (1000 * 60));
+      const days = Math.floor(totalMins / (60 * 24));
+      const hours = Math.floor((totalMins % (60 * 24)) / 60);
+      const mins = totalMins % 60;
+
+      if (days > 0) {
+        overdueDurationText = `Overdue by ${days}d ${hours}h`;
+      } else if (hours > 0) {
+        overdueDurationText = `Overdue by ${hours}h ${mins}m`;
+      } else {
+        overdueDurationText = `Overdue by ${Math.max(1, mins)}m`;
+      }
     } else {
       hoursLeft = msLeft / (1000 * 60 * 60);
       const totalMs = due.getTime() - created.getTime();
@@ -147,6 +162,15 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span className={`badge ${PRIORITY_MAP[task.priority].cls}`}>{PRIORITY_MAP[task.priority].label}</span>
             <span className={`badge ${STATUS_MAP[task.status].cls}`}>{STATUS_MAP[task.status].label}</span>
+            {isOverdue && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+                letterSpacing: '0.5px', textTransform: 'uppercase',
+                background: '#ef444420', color: '#ef4444', border: '1px solid #ef444440'
+              }}>
+                🚨 {overdueDurationText}
+              </span>
+            )}
             {completionStatus && (
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
@@ -159,11 +183,11 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
             {task.dueDate && (
               <span style={{
                 display: 'flex', alignItems: 'center', gap: 3,
-                fontSize: 11, color: isOverdue ? '#dc2626' : 'var(--text-muted)',
-                fontWeight: isOverdue ? 600 : 400,
+                fontSize: 11, color: isOverdue ? '#ef4444' : 'var(--text-muted)',
+                fontWeight: isOverdue ? 700 : 400,
               }}>
                 <Calendar size={11} />
-                {isOverdue ? '⚠ ' : ''}{format(new Date(task.dueDate), 'MMM d, h:mm a')}
+                {format(new Date(task.dueDate), 'MMM d, h:mm a')}
               </span>
             )}
             {task.estimatedMinutes && (
@@ -189,18 +213,18 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
             <div style={{ marginTop: 10, marginBottom: 2 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 500 }}>
                 <span>Time Elapsed</span>
-                <span style={{ color: isOverdue ? '#dc2626' : 'var(--text-secondary)' }}>
-                  {isOverdue ? 'Overdue' : `${hoursLeft?.toFixed(2)} hours left`}
+                <span style={{ color: isOverdue ? '#ef4444' : 'var(--text-secondary)', fontWeight: isOverdue ? 700 : 500 }}>
+                  {isOverdue ? `🚨 ${overdueDurationText}` : `${hoursLeft?.toFixed(2)} hours left`}
                 </span>
               </div>
               <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{
                   height: '100%',
-                  background: isOverdue ? '#dc2626' : pColor,
+                  background: isOverdue ? '#ef4444' : pColor,
                   width: `${progressPercent}%`,
                   transition: 'width 0.5s ease',
                   borderRadius: 4,
-                  boxShadow: `0 0 10px ${pColor}80`
+                  boxShadow: isOverdue ? '0 0 10px #ef444480' : `0 0 10px ${pColor}80`
                 }} />
               </div>
             </div>

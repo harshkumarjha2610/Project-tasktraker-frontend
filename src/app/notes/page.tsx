@@ -44,16 +44,22 @@ export default function NotesPage() {
     fetchNotes();
   }, []);
 
-  const handleSaveNote = async (noteData: Partial<Note>) => {
+  const handleSaveNote = async (noteData: Partial<Note>, noteId?: string): Promise<Note | undefined> => {
     try {
-      if (editingNote) {
-        await updateNote(editingNote.id, noteData);
+      let savedNote: Note;
+      const targetId = noteId || editingNote?.id;
+      if (targetId) {
+        savedNote = await updateNote(targetId, noteData);
       } else {
-        await createNote(noteData as Omit<Note, 'id' | 'createdAt' | 'updatedAt'>);
+        savedNote = await createNote(noteData as Omit<Note, 'id' | 'createdAt' | 'updatedAt'>);
+        setEditingNote(savedNote);
       }
-      fetchNotes();
+      const data = await getNotes();
+      setNotes(data);
+      return savedNote;
     } catch (err) {
       console.error('Failed to save note:', err);
+      return undefined;
     }
   };
 
@@ -128,14 +134,14 @@ export default function NotesPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 28 }}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Search Input */}
-          <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 440 }}>
+          <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: 440 }}>
             <Search size={18} style={{ position: 'absolute', left: 14, top: 12, color: 'var(--text-muted)' }} />
             <input
               className="input"
-              placeholder="Search by title, section, or content..."
+              placeholder="Search section or content..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ paddingLeft: 42, paddingRight: search ? 36 : 14, borderRadius: 12, height: 42 }}
+              style={{ paddingLeft: 42, paddingRight: search ? 36 : 14, borderRadius: 12, height: 42, width: '100%' }}
             />
             {search && (
               <button
@@ -158,7 +164,7 @@ export default function NotesPage() {
           </div>
 
           {/* Filter Pills */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             {COLOR_FILTERS.map((f) => {
               const isActive = selectedColor === f.id;
               return (
@@ -179,6 +185,8 @@ export default function NotesPage() {
                     border: isActive ? `1.5px solid ${f.color}` : '1.5px solid var(--border)',
                     cursor: 'pointer',
                     transition: 'all 0.18s ease',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                   }}
                 >
                   <span
@@ -231,8 +239,8 @@ export default function NotesPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-            gap: 20,
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 16,
             alignItems: 'start',
           }}
         >

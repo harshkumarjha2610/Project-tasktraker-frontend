@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2 } from 'lucide-react';
+import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2 } from 'lucide-react';
 import { Note } from '@/types/note';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -34,8 +34,8 @@ const FontSize = Extension.create({
   },
   addCommands() {
     return {
-      setFontSize: fontSize => ({ chain }) => chain().setMark('textStyle', { fontSize }).run(),
-      unsetFontSize: () => ({ chain }) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
+      setFontSize: fontSize => ({ chain }: any) => chain().setMark('textStyle', { fontSize }).run(),
+      unsetFontSize: () => ({ chain }: any) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
     };
   },
 });
@@ -55,7 +55,7 @@ const TabIndent = Extension.create({
 interface NoteModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (note: Partial<Note>) => void;
+  onSave: (note: Partial<Note>, noteId?: string) => Promise<Note | undefined>;
   initialData?: Note;
 }
 
@@ -94,40 +94,55 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
     background: isActive ? `${color}20` : 'transparent',
     color: isActive ? color : `${color}99`,
     border: 'none',
-    borderRadius: 4,
-    padding: 4,
+    borderRadius: 6,
+    padding: '6px 8px',
+    minWidth: 32,
+    height: 32,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s',
+    flexShrink: 0,
   });
 
   const handleIncreaseFont = () => {
     const currentSize = editor.getAttributes('textStyle').fontSize;
-    const sizeNum = currentSize ? parseInt(currentSize, 10) : 18;
+    const sizeNum = currentSize ? parseInt(currentSize, 10) : 16;
     editor.chain().focus().setFontSize(`${sizeNum + 2}px`).run();
   };
 
   const handleDecreaseFont = () => {
     const currentSize = editor.getAttributes('textStyle').fontSize;
-    const sizeNum = currentSize ? parseInt(currentSize, 10) : 18;
+    const sizeNum = currentSize ? parseInt(currentSize, 10) : 16;
     editor.chain().focus().setFontSize(`${Math.max(10, sizeNum - 2)}px`).run();
   };
 
   return (
-    <div style={{ display: 'flex', gap: 2, padding: '6px 32px', backgroundColor: 'rgba(255,255,255,0.02)', overflowX: 'auto', flexShrink: 0 }}>
-      <button type="button" onClick={handleDecreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 13, width: 24}} title="Decrease font size">A-</button>
-      <button type="button" onClick={handleIncreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 15, width: 24}} title="Increase font size">A+</button>
-      <div style={{ width: 1, background: `${color}20`, margin: '0 6px' }} />
+    <div 
+      className="note-toolbar"
+      style={{ 
+        display: 'flex', 
+        gap: 4, 
+        padding: '6px 16px', 
+        backgroundColor: 'rgba(255,255,255,0.03)', 
+        overflowX: 'auto', 
+        flexShrink: 0,
+        WebkitOverflowScrolling: 'touch',
+        borderBottom: `1px solid ${color}10`,
+      }}
+    >
+      <button type="button" onClick={handleDecreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 13}} title="Decrease font size">A-</button>
+      <button type="button" onClick={handleIncreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 15}} title="Increase font size">A+</button>
+      <div style={{ width: 1, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} style={btnStyle(editor.isActive('bold'))}><Bold size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} style={btnStyle(editor.isActive('italic'))}><Italic size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} style={btnStyle(editor.isActive('strike'))}><Strikethrough size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleHighlight().run()} style={btnStyle(editor.isActive('highlight'))}><Highlighter size={16} /></button>
-      <div style={{ width: 1, background: `${color}20`, margin: '0 6px' }} />
+      <div style={{ width: 1, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} style={btnStyle(editor.isActive('heading', { level: 1 }))}><Heading1 size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} style={btnStyle(editor.isActive('heading', { level: 2 }))}><Heading2 size={16} /></button>
-      <div style={{ width: 1, background: `${color}20`, margin: '0 6px' }} />
+      <div style={{ width: 1, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} style={btnStyle(editor.isActive('bulletList'))}><List size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} style={btnStyle(editor.isActive('orderedList'))}><ListOrdered size={16} /></button>
     </div>
@@ -135,15 +150,86 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
 };
 
 export default function NoteModal({ open, onClose, onSave, initialData }: NoteModalProps) {
-  const [title, setTitle] = useState('');
   const [color, setColor] = useState('paper');
   const [isMaximized, setIsMaximized] = useState(false);
   const [tabs, setTabs] = useState<NoteTab[]>([{ id: '1', name: 'Main', content: '' }]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
-  
-  const titleRef = useRef<HTMLInputElement>(null);
+
+  const [currentNoteId, setCurrentNoteId] = useState<string | undefined>(undefined);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
+
   const tabInputRef = useRef<HTMLInputElement>(null);
+  
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingRef = useRef<boolean>(false);
+  const pendingSaveRef = useRef<boolean>(false);
+  const isInitializingRef = useRef<boolean>(true);
+
+  // Keep a fresh state ref to prevent stale closures during debounced auto-save
+  const latestStateRef = useRef({
+    color,
+    tabs,
+    activeTabId,
+    currentNoteId,
+  });
+
+  useEffect(() => {
+    latestStateRef.current = { color, tabs, activeTabId, currentNoteId };
+  }, [color, tabs, activeTabId, currentNoteId]);
+
+  const performSave = async (overrides?: { color?: string; tabs?: NoteTab[]; activeTabId?: string; editorHtml?: string }) => {
+    if (isInitializingRef.current) return;
+
+    if (isSavingRef.current) {
+      pendingSaveRef.current = true;
+      return;
+    }
+
+    isSavingRef.current = true;
+    setSaveStatus('saving');
+
+    const state = latestStateRef.current;
+    const effColor = overrides?.color !== undefined ? overrides.color : state.color;
+    const effTabs = overrides?.tabs !== undefined ? overrides.tabs : state.tabs;
+    const effActiveTabId = overrides?.activeTabId !== undefined ? overrides.activeTabId : state.activeTabId;
+    const effEditorHtml = overrides?.editorHtml !== undefined ? overrides.editorHtml : (editor?.getHTML() || '');
+
+    const updatedTabs = effTabs.map(t => t.id === effActiveTabId ? { ...t, content: effEditorHtml } : t);
+    const serializedContent = JSON.stringify(updatedTabs);
+    const targetId = state.currentNoteId;
+
+    try {
+      const result = await onSave({ title: '', content: serializedContent, color: effColor }, targetId);
+      if (result && result.id && !state.currentNoteId) {
+        setCurrentNoteId(result.id);
+      }
+      setSaveStatus('saved');
+    } catch (err) {
+      console.error('Auto-save error:', err);
+      setSaveStatus('error');
+    } finally {
+      isSavingRef.current = false;
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        performSave();
+      }
+    }
+  };
+
+  const triggerAutoSave = (overrides?: { color?: string; tabs?: NoteTab[]; activeTabId?: string; editorHtml?: string }) => {
+    if (isInitializingRef.current) return;
+    setSaveStatus('unsaved');
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      performSave(overrides);
+    }, 400);
+  };
 
   const editor = useEditor({
     extensions: [StarterKit, Highlight, TextStyle, FontSize, TabIndent],
@@ -153,15 +239,21 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
         class: 'tiptap-editor',
       },
     },
+    onUpdate({ editor: ed }) {
+      if (!isInitializingRef.current) {
+        triggerAutoSave({ editorHtml: ed.getHTML() });
+      }
+    },
   });
 
   useEffect(() => {
     if (open) {
+      isInitializingRef.current = true;
+      setCurrentNoteId(initialData?.id);
+      
       if (initialData) {
-        setTitle(initialData.title || '');
         setColor(initialData.color && initialData.color !== 'default' ? initialData.color : 'paper');
         
-        // Parse tabs from content if it's JSON, else treat as a single tab
         try {
           const parsed = JSON.parse(initialData.content || '[]');
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -178,15 +270,22 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           editor?.commands.setContent(initialData.content || '');
         }
       } else {
-        setTitle('');
         setColor('paper');
         setTabs([{ id: '1', name: 'Main', content: '' }]);
         setActiveTabId('1');
         editor?.commands.setContent('');
       }
+      
       setIsMaximized(false);
       setEditingTabId(null);
-      setTimeout(() => titleRef.current?.focus(), 100);
+      setSaveStatus('saved');
+
+      const initTimer = setTimeout(() => {
+        isInitializingRef.current = false;
+        editor?.commands.focus('start');
+      }, 120);
+
+      return () => clearTimeout(initTimer);
     }
   }, [open, initialData, editor]);
 
@@ -202,16 +301,31 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
 
   if (!open) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCloseModal = async () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     
-    // Save current editor content to active tab
+    // Save any pending changes before closing modal
     const currentContent = editor?.getHTML() || '';
-    const updatedTabs = tabs.map(t => t.id === activeTabId ? { ...t, content: currentContent } : t);
+    const currentTabs = tabs.map(t => t.id === activeTabId ? { ...t, content: currentContent } : t);
+    const hasContent = currentTabs.some(t => t.content && t.content !== '<p></p>');
+
+    if (hasContent || currentNoteId) {
+      await performSave({ editorHtml: currentContent, tabs: currentTabs });
+    }
     
-    // Serialize tabs
-    const serializedContent = JSON.stringify(updatedTabs);
-    onSave({ title, content: serializedContent, color });
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    await performSave();
     onClose();
   };
 
@@ -219,15 +333,14 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
     if (newTabId === activeTabId) return;
     
     const currentContent = editor?.getHTML() || '';
+    const updatedTabs = tabs.map(t => t.id === activeTabId ? { ...t, content: currentContent } : t);
+    setTabs(updatedTabs);
     
-    setTabs(prev => {
-      const updated = prev.map(t => t.id === activeTabId ? { ...t, content: currentContent } : t);
-      const nextTab = updated.find(t => t.id === newTabId);
-      editor?.commands.setContent(nextTab?.content || '');
-      return updated;
-    });
-    
+    const nextTab = updatedTabs.find(t => t.id === newTabId);
+    editor?.commands.setContent(nextTab?.content || '');
     setActiveTabId(newTabId);
+
+    triggerAutoSave({ tabs: updatedTabs, activeTabId: newTabId, editorHtml: nextTab?.content || '' });
   };
 
   const handleAddTab = () => {
@@ -235,13 +348,14 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
     const newId = Date.now().toString();
     const newTab = { id: newId, name: `Section ${tabs.length + 1}`, content: '' };
     
-    setTabs(prev => {
-      const updated = prev.map(t => t.id === activeTabId ? { ...t, content: currentContent } : t);
-      return [...updated, newTab];
-    });
+    const updatedTabs = tabs.map(t => t.id === activeTabId ? { ...t, content: currentContent } : t);
+    const newTabsList = [...updatedTabs, newTab];
     
+    setTabs(newTabsList);
     setActiveTabId(newId);
     editor?.commands.setContent('');
+
+    triggerAutoSave({ tabs: newTabsList, activeTabId: newId, editorHtml: '' });
   };
 
   const handleDeleteTab = (e: React.MouseEvent, id: string) => {
@@ -251,10 +365,17 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
     const newTabs = tabs.filter(t => t.id !== id);
     setTabs(newTabs);
     
+    let nextActiveId = activeTabId;
+    let nextContent = editor?.getHTML() || '';
+
     if (activeTabId === id) {
-      setActiveTabId(newTabs[0].id);
-      editor?.commands.setContent(newTabs[0].content);
+      nextActiveId = newTabs[0].id;
+      nextContent = newTabs[0].content;
+      setActiveTabId(nextActiveId);
+      editor?.commands.setContent(nextContent);
     }
+
+    triggerAutoSave({ tabs: newTabs, activeTabId: nextActiveId, editorHtml: nextContent });
   };
 
   const handleRenameTab = (e: React.KeyboardEvent | React.FocusEvent) => {
@@ -262,20 +383,26 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
     
     const newName = tabInputRef.current?.value.trim();
     if (newName) {
-      setTabs(prev => prev.map(t => t.id === editingTabId ? { ...t, name: newName } : t));
+      const updated = tabs.map(t => t.id === editingTabId ? { ...t, name: newName } : t);
+      setTabs(updated);
+      triggerAutoSave({ tabs: updated });
     }
     setEditingTabId(null);
+  };
+
+  const handleColorSelect = (newColor: string) => {
+    setColor(newColor);
+    triggerAutoSave({ color: newColor });
   };
 
   const bgHex = COLORS.find(c => c.value === color)?.hex || 'var(--bg-card)';
   const textColor = TEXT_COLOR_MAP[color] || TEXT_COLOR_MAP.default;
   const isDefault = color === 'default';
-  const lineSpacing = 32;
 
   return (
     <div 
-      className="modal-overlay open" 
-      onClick={onClose}
+      className="modal-overlay open note-modal-overlay" 
+      onClick={handleCloseModal}
       style={{ 
         position: 'fixed',
         top: 0,
@@ -292,6 +419,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
       }}
     >
       <div 
+        className="note-modal-container"
         onClick={(e) => e.stopPropagation()} 
         style={{ 
           width: isMaximized ? '100vw' : '80vw', 
@@ -314,65 +442,120 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', zIndex: 1 }}>
           
           {/* Top Navigation Bar */}
-          <div style={{ 
-            padding: '12px 24px', 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            borderBottom: isDefault ? '1px solid var(--border)' : `1px solid ${textColor}15`,
-            backgroundColor: bgHex,
-            flexShrink: 0
-          }}>
-            {/* Left side: Back / Close button & Maximize */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div 
+            className="note-modal-header"
+            style={{ 
+              padding: '12px 20px', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              borderBottom: isDefault ? '1px solid var(--border)' : `1px solid ${textColor}15`,
+              backgroundColor: bgHex,
+              flexShrink: 0,
+              gap: 8,
+              flexWrap: 'wrap'
+            }}
+          >
+            {/* Left side: Back / Close button, Auto-save status, & Maximize */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <button 
                 type="button" 
-                onClick={onClose} 
+                onClick={handleCloseModal} 
                 style={{ 
                   display: 'flex', alignItems: 'center', gap: 6,
                   background: 'none', border: 'none', cursor: 'pointer', 
-                  color: textColor, opacity: 0.6, fontSize: 14, fontWeight: 500,
-                  transition: 'opacity 0.2s'
+                  color: textColor, opacity: 0.8, fontSize: 14, fontWeight: 500,
+                  transition: 'opacity 0.2s',
+                  padding: '4px 0'
                 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0.8'}
               >
                 <ArrowLeft size={18} /> Close
               </button>
               
               <button
                 type="button"
+                className="hide-on-mobile"
                 onClick={() => setIsMaximized(!isMaximized)}
                 style={{ 
                   display: 'flex', alignItems: 'center', gap: 6,
                   background: 'none', border: 'none', cursor: 'pointer', 
-                  color: textColor, opacity: 0.6,
+                  color: textColor, opacity: 0.8,
                   transition: 'opacity 0.2s'
                 }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0.8'}
                 title={isMaximized ? "Restore Size" : "Maximize"}
               >
                 {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
+
+              {/* Auto-Save Status Badge */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 10px',
+                borderRadius: 12,
+                backgroundColor: `${textColor}0D`,
+                fontSize: 12,
+                fontWeight: 500,
+                color: textColor,
+                userSelect: 'none'
+              }}>
+                {saveStatus === 'saving' && (
+                  <>
+                    <Loader2 size={13} className="spin" style={{ color: '#3b82f6' }} />
+                    <span style={{ color: '#3b82f6' }}>Auto-saving...</span>
+                  </>
+                )}
+                {saveStatus === 'saved' && (
+                  <>
+                    <Check size={13} style={{ color: '#10b981' }} />
+                    <span style={{ color: '#10b981' }}>Saved</span>
+                  </>
+                )}
+                {saveStatus === 'unsaved' && (
+                  <>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
+                    <span style={{ color: '#f59e0b' }}>Unsaved</span>
+                  </>
+                )}
+                {saveStatus === 'error' && (
+                  <span style={{ color: '#ef4444' }}>Save failed</span>
+                )}
+              </div>
             </div>
 
             {/* Right side: Colors & Save */}
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginLeft: 'auto' }}>
+              <div 
+                className="note-colors-bar"
+                style={{ 
+                  display: 'flex', 
+                  gap: 6, 
+                  alignItems: 'center',
+                  overflowX: 'auto',
+                  maxHeight: 32,
+                  padding: '2px 0',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
                 {COLORS.map(c => (
                   <button
                     key={c.value}
                     type="button"
-                    onClick={() => setColor(c.value)}
+                    onClick={() => handleColorSelect(c.value)}
                     style={{
-                      width: 24, height: 24, borderRadius: '50%',
+                      width: 22, height: 22, borderRadius: '50%',
                       background: c.accent,
                       border: color === c.value ? `2px solid ${textColor}` : '2px solid transparent',
                       boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                       cursor: 'pointer',
                       transition: 'transform 0.2s',
-                      transform: color === c.value ? 'scale(1.15)' : 'scale(1)'
+                      transform: color === c.value ? 'scale(1.15)' : 'scale(1)',
+                      flexShrink: 0
                     }}
                     title={c.label}
                   />
@@ -384,10 +567,11 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
                 className="btn btn-primary" 
                 style={{ 
                   display: 'flex', alignItems: 'center', gap: 6, 
-                  padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600
+                  padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+                  flexShrink: 0
                 }}
               >
-                <Save size={14} /> Save Note
+                <Save size={14} /> Done
               </button>
             </div>
           </div>
@@ -398,9 +582,10 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            padding: '0 32px',
+            padding: '0 20px',
             gap: 8,
             overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
             borderBottom: isDefault ? '1px solid var(--border)' : `1px solid ${textColor}15`,
             backgroundColor: 'rgba(255,255,255,0.01)',
           }}>
@@ -410,7 +595,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
                 onClick={() => handleTabChange(tab.id)}
                 onDoubleClick={() => setEditingTabId(tab.id)}
                 style={{
-                  padding: '8px 16px',
+                  padding: '8px 14px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
@@ -420,7 +605,8 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
                   fontWeight: activeTabId === tab.id ? 600 : 500,
                   fontSize: 14,
                   transition: 'all 0.2s',
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 {editingTabId === tab.id ? (
@@ -467,7 +653,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'none', border: 'none', cursor: 'pointer',
                 color: textColor, opacity: 0.6, padding: '8px',
-                borderRadius: '50%'
+                borderRadius: '50%', flexShrink: 0
               }}
               onMouseEnter={e => e.currentTarget.style.opacity = '1'}
               onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
@@ -477,55 +663,67 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           </div>
           
           <style dangerouslySetInnerHTML={{__html: `
-            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 1.6; color: ${textColor}; padding-top: 5px; cursor: text; white-space: pre-wrap; }
-            .tiptap-editor p { margin: 0 0 12px 0; }
-            .tiptap-editor h1, .tiptap-editor h2 { margin: 16px 0 8px 0; font-weight: 700; }
-            .tiptap-editor ul, .tiptap-editor ol { margin: 0 0 12px 0; padding-left: 24px; }
-            .tiptap-editor li { margin: 4px 0; }
+            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor}; cursor: text; white-space: pre-wrap; }
+            .tiptap-editor p { margin: 0; line-height: 32px; min-height: 32px; }
+            .tiptap-editor h1 { margin: 0; font-size: 22px; line-height: 32px; font-weight: 700; }
+            .tiptap-editor h2 { margin: 0; font-size: 18px; line-height: 32px; font-weight: 700; }
+            .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; }
+            .tiptap-editor li { margin: 0; line-height: 32px; }
             .tiptap-editor mark { background-color: rgba(250, 204, 21, 0.4); color: inherit; padding: 2px 4px; border-radius: 4px; }
-            .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 0; pointer-events: none; }
+            .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 32px; line-height: 32px; pointer-events: none; }
+
+            @media (max-width: 640px) {
+              .note-modal-overlay {
+                padding: 0 !important;
+              }
+              .note-modal-container {
+                width: 100vw !important;
+                height: 100vh !important;
+                min-width: 100% !important;
+                min-height: 100% !important;
+                border-radius: 0 !important;
+                resize: none !important;
+              }
+              .hide-on-mobile {
+                display: none !important;
+              }
+              .note-modal-header {
+                padding: 10px 14px !important;
+              }
+              .note-colors-bar {
+                max-width: 130px;
+              }
+              .note-editor-container {
+                padding: 4px 16px 24px 44px !important;
+                background-image: ${color === 'paper' 
+                  ? `linear-gradient(to right, transparent 24px, #ef4444cc 24px, #ef4444cc 25.5px, transparent 25.5px),
+                     linear-gradient(to right, transparent 28px, #ef4444cc 28px, #ef4444cc 29.5px, transparent 29.5px),
+                     repeating-linear-gradient(transparent, transparent 31px, rgba(59, 130, 246, 0.2) 31px, rgba(59, 130, 246, 0.2) 32px)`
+                  : 'none'} !important;
+              }
+            }
           `}} />
 
           {/* Editor Area */}
-          <div style={{ 
-            flex: 1, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            position: 'relative',
-            padding: color === 'paper' ? '24px 32px 32px 92px' : '24px 32px 32px 32px', 
-            gap: 16, 
-            overflowY: 'auto',
-            backgroundImage: color === 'paper' 
-              ? 'repeating-linear-gradient(transparent, transparent 31px, rgba(59, 130, 246, 0.15) 31px, rgba(59, 130, 246, 0.15) 32px)'
-              : 'none',
-            backgroundPosition: '0 0',
-          }}>
-            {/* Double Red Notebook Margin Lines starting below toolbar & tabs */}
-            {color === 'paper' && (
-              <>
-                <div style={{
-                  position: 'absolute',
-                  left: '68px',
-                  top: 0,
-                  bottom: 0,
-                  width: '1.5px',
-                  backgroundColor: '#ef444499',
-                  zIndex: 2,
-                  pointerEvents: 'none'
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  left: '73px',
-                  top: 0,
-                  bottom: 0,
-                  width: '1.5px',
-                  backgroundColor: '#ef444499',
-                  zIndex: 2,
-                  pointerEvents: 'none'
-                }} />
-              </>
-            )}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div 
+            className="note-editor-container"
+            style={{ 
+              flex: 1, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              position: 'relative',
+              padding: color === 'paper' ? '4px 32px 32px 92px' : '24px 32px 32px 32px', 
+              overflowY: 'auto',
+              backgroundImage: color === 'paper' 
+                ? `linear-gradient(to right, transparent 67px, #ef4444cc 67px, #ef4444cc 68.5px, transparent 68.5px),
+                   linear-gradient(to right, transparent 72px, #ef4444cc 72px, #ef4444cc 73.5px, transparent 73.5px),
+                   repeating-linear-gradient(transparent, transparent 31px, rgba(59, 130, 246, 0.2) 31px, rgba(59, 130, 246, 0.2) 32px)`
+                : 'none',
+              backgroundPosition: '0 0',
+              backgroundAttachment: 'local',
+            }}
+          >
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
               <EditorContent editor={editor} style={{ flex: 1, display: 'flex', flexDirection: 'column' }} />
             </div>
           </div>
