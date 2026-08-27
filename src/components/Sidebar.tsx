@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CheckSquare, BarChart3, Tag, Settings,
-  Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen, Gamepad2, StickyNote
+  Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen, Gamepad2, StickyNote, Hourglass, Timer
 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -12,7 +12,9 @@ const NAV_ITEMS = [
   { href: '/',           icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/tasks',      icon: CheckSquare,     label: 'Tasks' },
   { href: '/notes',      icon: StickyNote,      label: 'Notes' },
+  { href: '/pomodoro',   icon: Timer,           label: 'Pomodoro Timer' },
   { href: '/analytics',  icon: BarChart3,       label: 'Analytics' },
+  { href: '/time-waste', icon: Hourglass,       label: 'Time Waste' },
   { href: '/categories', icon: Tag,             label: 'Categories' },
   { href: '/settings',   icon: Settings,        label: 'Settings' },
 ];
