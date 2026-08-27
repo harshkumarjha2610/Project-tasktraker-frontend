@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
+import FloatingPomodoroWidget from '@/components/FloatingPomodoroWidget';
 import { TaskProvider } from '@/context/TaskContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { PomodoroProvider } from '@/context/PomodoroContext';
 import { Menu, Sun, Moon, Zap, Gamepad2 } from 'lucide-react';
 
 function ThemeToggle() {
@@ -93,6 +95,9 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
       <main className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         {children}
       </main>
+
+      {/* Persistent Floating Mini Pomodoro Widget across all app tabs */}
+      <FloatingPomodoroWidget />
     </>
   );
 }
@@ -101,7 +106,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <ThemeProvider>
       <TaskProvider>
-        <InnerLayout>{children}</InnerLayout>
+        <PomodoroProvider>
+          <InnerLayout>{children}</InnerLayout>
+        </PomodoroProvider>
       </TaskProvider>
     </ThemeProvider>
   );

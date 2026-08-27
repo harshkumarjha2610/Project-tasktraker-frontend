@@ -1,673 +1,50 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import {
   Play, Pause, RotateCcw, SkipForward, Settings, Volume2, VolumeX,
   CheckCircle2, Flame, Award, Clock, Sparkles, Target, X, Check,
   Maximize2, Minimize2, Plus, Minus, Zap, CloudRain, Waves, Wind,
   Coffee, Music, RefreshCw, Trophy, Quote, AlertTriangle, ShieldAlert,
-  Palette, Sun, Moon, Sparkle
+  Palette, BellRing, Sliders
 } from 'lucide-react';
 import { useTaskContext } from '@/context/TaskContext';
-
-type TimerMode = 'work' | 'shortBreak' | 'longBreak';
-type AmbientSoundType = 'none' | 'rain' | 'waves' | 'space' | 'cafe';
-type PomodoroThemeColor = 'purple' | 'emerald' | 'amber' | 'cyberpunk' | 'indigo' | 'rose';
-type PomodoroBgStyle = 'default' | 'oled' | 'gradient' | 'glass';
-
-interface TimerSettings {
-  workDuration: number; // in minutes
-  shortBreakDuration: number;
-  longBreakDuration: number;
-  longBreakInterval: number;
-  autoStartBreaks: boolean;
-  autoStartPomodoros: boolean;
-  soundEnabled: boolean;
-}
-
-interface PomodoroSession {
-  id: string;
-  mode: TimerMode;
-  durationMinutes: number;
-  taskTitle?: string;
-  completedAt: string;
-}
-
-interface WastedSessionRecord {
-  id: string;
-  mode: TimerMode;
-  taskTitle?: string;
-  durationSeconds: number;
-  interruptedAt: string;
-  isOverdueDelay?: boolean;
-}
-
-const DEFAULT_SETTINGS: TimerSettings = {
-  workDuration: 25,
-  shortBreakDuration: 5,
-  longBreakDuration: 15,
-  longBreakInterval: 4,
-  autoStartBreaks: false,
-  autoStartPomodoros: false,
-  soundEnabled: true,
-};
-
-const THEME_PALETTES: Record<PomodoroThemeColor, { name: string; primary: string; secondary: string; glow: string; gradient: string }> = {
-  purple: {
-    name: 'Cyber Violet',
-    primary: '#8b5cf6',
-    secondary: '#ec4899',
-    glow: 'rgba(139, 92, 246, 0.4)',
-    gradient: 'linear-gradient(135deg, #8b5cf6, #ec4899)'
-  },
-  emerald: {
-    name: 'Emerald Matrix',
-    primary: '#06b6d4',
-    secondary: '#10b981',
-    glow: 'rgba(6, 186, 212, 0.4)',
-    gradient: 'linear-gradient(135deg, #06b6d4, #10b981)'
-  },
-  amber: {
-    name: 'Solar Flame',
-    primary: '#f59e0b',
-    secondary: '#ef4444',
-    glow: 'rgba(245, 158, 11, 0.4)',
-    gradient: 'linear-gradient(135deg, #f59e0b, #ef4444)'
-  },
-  cyberpunk: {
-    name: 'Neon Cyberpunk',
-    primary: '#00ffcc',
-    secondary: '#ff0055',
-    glow: 'rgba(0, 255, 204, 0.4)',
-    gradient: 'linear-gradient(135deg, #00ffcc, #ff0055)'
-  },
-  indigo: {
-    name: 'Midnight Indigo',
-    primary: '#3b82f6',
-    secondary: '#8b5cf6',
-    glow: 'rgba(59, 130, 246, 0.4)',
-    gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)'
-  },
-  rose: {
-    name: 'Rose Quartz',
-    primary: '#f43f5e',
-    secondary: '#a855f7',
-    glow: 'rgba(244, 63, 94, 0.4)',
-    gradient: 'linear-gradient(135deg, #f43f5e, #a855f7)'
-  }
-};
-
-const BG_STYLES: Record<PomodoroBgStyle, { name: string; background: string; border: string; backdropFilter?: string }> = {
-  default: {
-    name: 'Standard Card',
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border)'
-  },
-  oled: {
-    name: 'OLED Black',
-    background: '#040407',
-    border: '1px solid rgba(255, 255, 255, 0.12)'
-  },
-  gradient: {
-    name: 'Gradient Aura',
-    background: 'linear-gradient(135deg, rgba(22, 22, 35, 0.95), rgba(12, 12, 20, 0.95))',
-    border: '1px solid rgba(139, 92, 246, 0.25)'
-  },
-  glass: {
-    name: 'Frosted Glass',
-    background: 'rgba(255, 255, 255, 0.04)',
-    border: '1px solid rgba(255, 255, 255, 0.15)',
-    backdropFilter: 'blur(20px)'
-  }
-};
-
-const MOTIVATIONAL_QUOTES = [
-  "Focus on being productive instead of busy.",
-  "Your future self will thank you for this session.",
-  "Deep work is the superpower of the 21st century.",
-  "One session at a time, extraordinary results compound.",
-  "Discipline is choosing between what you want now and what you want most.",
-  "Small daily improvements over time lead to stunning results.",
-  "Turn off distraction. Turn on flow state."
-];
-
-// Web Audio Chime Synthesizer
-const playAudioChime = (type: 'start' | 'pause' | 'complete') => {
-  if (typeof window === 'undefined') return;
-  try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-
-    if (type === 'start') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.25);
-    } else if (type === 'pause') {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(600, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.2);
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.2);
-    } else if (type === 'complete') {
-      const notes = [523.25, 659.25, 783.99, 1046.50];
-      notes.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const startTime = ctx.currentTime + idx * 0.12;
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0.2, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(startTime);
-        osc.stop(startTime + 0.4);
-      });
-    }
-  } catch {
-    // Ignore audio context errors
-  }
-};
+import {
+  usePomodoroContext,
+  THEME_PALETTES,
+  BG_STYLES,
+  CLOCK_STYLES,
+  MOTIVATIONAL_QUOTES,
+  TimerMode,
+  AmbientSoundType,
+  PomodoroThemeColor,
+  PomodoroBgStyle,
+  ClockSoundStyle,
+  TimerSettings
+} from '@/context/PomodoroContext';
 
 export default function PomodoroPage() {
   const { filteredTasks, toggleComplete } = useTaskContext();
+  const {
+    mode, switchMode,
+    timeLeft, isRunning, togglePlay, handleReset, handleSkip, adjustTime,
+    selectedTaskId, setSelectedTaskId,
+    completedSessionsCount,
+    history, wasteHistory,
+    isInterrupted, wastedSeconds, totalWastedSecondsToday, overdueBreakMode,
+    settings, saveSettings,
+    colorTheme, changeColorTheme,
+    bgStyle, changeBgStyle,
+    zenMode, setZenMode,
+    ambientSound, setAmbientSound,
+    ambientVolume, setAmbientVolume,
+    quoteIndex, setQuoteIndex,
+    formatSecsToMMSS, getModeTitle, getModeDurationSeconds
+  } = usePomodoroContext();
 
-  // Settings State
-  const [settings, setSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Theme & Background Customization State
-  const [colorTheme, setColorTheme] = useState<PomodoroThemeColor>('purple');
-  const [bgStyle, setBgStyle] = useState<PomodoroBgStyle>('default');
-
-  // Timer Core State
-  const [mode, setMode] = useState<TimerMode>('work');
-  const [timeLeft, setTimeLeft] = useState<number>(DEFAULT_SETTINGS.workDuration * 60);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [selectedTaskId, setSelectedTaskId] = useState<string>('');
-  const [completedSessionsCount, setCompletedSessionsCount] = useState<number>(0);
-  const [history, setHistory] = useState<PomodoroSession[]>([]);
-
-  // Time Waste Tracker State
-  const [hasSessionStarted, setHasSessionStarted] = useState<boolean>(false);
-  const [isInterrupted, setIsInterrupted] = useState<boolean>(false);
-  const [overdueBreakMode, setOverdueBreakMode] = useState<TimerMode | null>(null);
-  const [wastedSeconds, setWastedSeconds] = useState<number>(0);
-  const [totalWastedSecondsToday, setTotalWastedSecondsToday] = useState<number>(0);
-  const [wasteHistory, setWasteHistory] = useState<WastedSessionRecord[]>([]);
-
-  // Creative Features State
-  const [zenMode, setZenMode] = useState<boolean>(false);
-  const [ambientSound, setAmbientSound] = useState<AmbientSoundType>('none');
-  const [ambientVolume, setAmbientVolume] = useState<number>(0.3);
-  const [quoteIndex, setQuoteIndex] = useState<number>(0);
-
-  // Web Audio Ambient Generator Refs
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const ambientGainNodeRef = useRef<GainNode | null>(null);
-  const ambientNodesRef = useRef<AudioNode[]>([]);
-
-  // Load saved data from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('dt_pomodoro_settings');
-      if (savedSettings) {
-        try {
-          const parsed = JSON.parse(savedSettings);
-          setSettings(parsed);
-          setTimeLeft(parsed.workDuration * 60);
-        } catch (e) {
-          console.error('Failed to parse pomodoro settings', e);
-        }
-      }
-
-      const savedColorTheme = localStorage.getItem('dt_pomodoro_color_theme') as PomodoroThemeColor;
-      if (savedColorTheme && THEME_PALETTES[savedColorTheme]) {
-        setColorTheme(savedColorTheme);
-      }
-
-      const savedBgStyle = localStorage.getItem('dt_pomodoro_bg_style') as PomodoroBgStyle;
-      if (savedBgStyle && BG_STYLES[savedBgStyle]) {
-        setBgStyle(savedBgStyle);
-      }
-
-      const savedHistory = localStorage.getItem('dt_pomodoro_history');
-      if (savedHistory) {
-        try {
-          const parsedHistory = JSON.parse(savedHistory);
-          setHistory(parsedHistory);
-          const todayStr = new Date().toDateString();
-          const todayWorkCount = parsedHistory.filter((s: PomodoroSession) =>
-            s.mode === 'work' && new Date(s.completedAt).toDateString() === todayStr
-          ).length;
-          setCompletedSessionsCount(todayWorkCount);
-        } catch (e) {
-          console.error('Failed to parse pomodoro history', e);
-        }
-      }
-
-      const savedWasteHistory = localStorage.getItem('dt_pomodoro_waste_history');
-      if (savedWasteHistory) {
-        try {
-          const parsedWaste = JSON.parse(savedWasteHistory);
-          setWasteHistory(parsedWaste);
-          const todayStr = new Date().toDateString();
-          const todayWasteTotal = parsedWaste
-            .filter((w: WastedSessionRecord) => new Date(w.interruptedAt).toDateString() === todayStr)
-            .reduce((acc: number, w: WastedSessionRecord) => acc + w.durationSeconds, 0);
-          setTotalWastedSecondsToday(todayWasteTotal);
-        } catch (e) {
-          console.error('Failed to parse waste history', e);
-        }
-      }
-
-      setQuoteIndex(Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length));
-    }
-  }, []);
-
-  const changeColorTheme = (t: PomodoroThemeColor) => {
-    setColorTheme(t);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dt_pomodoro_color_theme', t);
-    }
-  };
-
-  const changeBgStyle = (b: PomodoroBgStyle) => {
-    setBgStyle(b);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dt_pomodoro_bg_style', b);
-    }
-  };
-
-  // Commit Wasted Time Session
-  const saveInterruptedWasteSession = useCallback((durationSecs: number, currentMode: TimerMode, taskTitle?: string, overdueFromMode?: TimerMode | null) => {
-    if (durationSecs < 2) return;
-    const now = Date.now();
-    const startTimeISO = new Date(now - durationSecs * 1000).toISOString();
-    const endTimeISO = new Date(now).toISOString();
-
-    const modeLabel = overdueFromMode
-      ? `Overdue Focus Start (Delayed return after ${overdueFromMode === 'shortBreak' ? 'Short Break' : 'Long Break'})`
-      : currentMode === 'work'
-      ? (taskTitle ? `Interrupted Pomodoro ("${taskTitle}")` : `Interrupted Pomodoro Focus Session`)
-      : currentMode === 'shortBreak'
-      ? `Interrupted Short Break Session`
-      : `Interrupted Long Break Session`;
-
-    const newRecord: WastedSessionRecord = {
-      id: Math.random().toString(36).substring(2, 9),
-      mode: currentMode,
-      taskTitle: currentMode === 'work' ? taskTitle : undefined,
-      durationSeconds: durationSecs,
-      interruptedAt: endTimeISO,
-      isOverdueDelay: !!overdueFromMode
-    };
-
-    setWasteHistory(prev => {
-      const updated = [newRecord, ...prev];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dt_pomodoro_waste_history', JSON.stringify(updated));
-      }
-      return updated;
-    });
-
-    setTotalWastedSecondsToday(prev => {
-      const newTotal = prev + durationSecs;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dt_pomodoro_total_waste_secs', String(newTotal));
-      }
-      return newTotal;
-    });
-
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('tw_history_sessions');
-        const existingSessions = stored ? JSON.parse(stored) : [];
-        const newWasteSession = {
-          id: Date.now().toString(),
-          startTime: startTimeISO,
-          endTime: endTimeISO,
-          durationMs: durationSecs * 1000,
-          reason: modeLabel
-        };
-        localStorage.setItem('tw_history_sessions', JSON.stringify([newWasteSession, ...existingSessions]));
-      } catch (e) {
-        console.error('Failed to sync to tw_history_sessions', e);
-      }
-    }
-  }, []);
-
-  // Interrupted / Overdue Wasted Time Ticker Interval
-  useEffect(() => {
-    let wasteInterval: NodeJS.Timeout | null = null;
-    if (isInterrupted) {
-      wasteInterval = setInterval(() => {
-        setWastedSeconds(prev => prev + 1);
-      }, 1000);
-    } else if (wasteInterval) {
-      clearInterval(wasteInterval);
-    }
-    return () => {
-      if (wasteInterval) clearInterval(wasteInterval);
-    };
-  }, [isInterrupted]);
-
-  // Request Notification permission
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
-
-  // Mode durations in seconds
-  const getModeDurationSeconds = useCallback((m: TimerMode, customSettings = settings) => {
-    switch (m) {
-      case 'work': return customSettings.workDuration * 60;
-      case 'shortBreak': return customSettings.shortBreakDuration * 60;
-      case 'longBreak': return customSettings.longBreakDuration * 60;
-    }
-  }, [settings]);
-
   const activeTask = filteredTasks.find(t => t.id === selectedTaskId);
-
-  // Switch mode helper
-  const switchMode = useCallback((newMode: TimerMode, autoStart = false) => {
-    if (isInterrupted && wastedSeconds > 0) {
-      saveInterruptedWasteSession(wastedSeconds, mode, activeTask?.title, overdueBreakMode);
-      setWastedSeconds(0);
-      setIsInterrupted(false);
-      setOverdueBreakMode(null);
-    }
-    setHasSessionStarted(false);
-    setMode(newMode);
-    setTimeLeft(getModeDurationSeconds(newMode));
-    setIsRunning(autoStart);
-    setQuoteIndex(prev => (prev + 1) % MOTIVATIONAL_QUOTES.length);
-  }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, getModeDurationSeconds]);
-
-  // Handle Session Completion
-  const handleSessionComplete = useCallback(() => {
-    if (isInterrupted && wastedSeconds > 0) {
-      saveInterruptedWasteSession(wastedSeconds, mode, activeTask?.title, overdueBreakMode);
-      setWastedSeconds(0);
-      setIsInterrupted(false);
-      setOverdueBreakMode(null);
-    }
-    setHasSessionStarted(false);
-
-    if (settings.soundEnabled) {
-      playAudioChime('complete');
-    }
-
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      const title = mode === 'work' ? '🎉 Focus Session Completed! +50 XP' : '⚡ Break Time Over!';
-      const body = mode === 'work'
-        ? 'Great work! Take a break to recharge.'
-        : 'Break is over! Time to jump back into your focus flow!';
-      new Notification(title, { body, icon: '/favicon.ico' });
-    }
-
-    const linkedTask = filteredTasks.find(t => t.id === selectedTaskId);
-    const newSession: PomodoroSession = {
-      id: Math.random().toString(36).substring(2, 9),
-      mode,
-      durationMinutes: mode === 'work' ? settings.workDuration : mode === 'shortBreak' ? settings.shortBreakDuration : settings.longBreakDuration,
-      taskTitle: linkedTask ? linkedTask.title : undefined,
-      completedAt: new Date().toISOString(),
-    };
-
-    setHistory(prev => {
-      const updated = [newSession, ...prev];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dt_pomodoro_history', JSON.stringify(updated));
-      }
-      return updated;
-    });
-
-    if (mode === 'work') {
-      const newCount = completedSessionsCount + 1;
-      setCompletedSessionsCount(newCount);
-
-      const isLongBreak = newCount % settings.longBreakInterval === 0;
-      const nextMode: TimerMode = isLongBreak ? 'longBreak' : 'shortBreak';
-      switchMode(nextMode, settings.autoStartBreaks);
-    } else {
-      const finishedBreak = mode;
-      switchMode('work', settings.autoStartPomodoros);
-
-      if (!settings.autoStartPomodoros) {
-        setIsInterrupted(true);
-        setOverdueBreakMode(finishedBreak);
-      }
-    }
-  }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, selectedTaskId, completedSessionsCount, switchMode]);
-
-  // Timer Tick Interval
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current as NodeJS.Timeout);
-            handleSessionComplete();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRunning, handleSessionComplete]);
-
-  // Update Document Title
-  useEffect(() => {
-    const mins = Math.floor(timeLeft / 60);
-    const secs = timeLeft % 60;
-    const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    const modeName = mode === 'work' ? 'Focus' : mode === 'shortBreak' ? 'Short Break' : 'Long Break';
-
-    if (isInterrupted) {
-      const wMins = Math.floor(wastedSeconds / 60);
-      const wSecs = wastedSeconds % 60;
-      const wFormatted = `${wMins.toString().padStart(2, '0')}:${wSecs.toString().padStart(2, '0')}`;
-      if (overdueBreakMode) {
-        document.title = `🚨 (${wFormatted} Wasted) Overdue Focus Return - DailyTask`;
-      } else {
-        document.title = `⚠️ (${wFormatted} Wasted) ${modeName} Interrupted - DailyTask`;
-      }
-    } else {
-      document.title = isRunning ? `(${formatted}) ${modeName} - DailyTask` : 'Pomodoro Timer - DailyTask';
-    }
-  }, [timeLeft, mode, isRunning, isInterrupted, wastedSeconds, overdueBreakMode]);
-
-  // Ambient Sound Engine
-  const stopAmbientSound = useCallback(() => {
-    ambientNodesRef.current.forEach(node => {
-      try {
-        if ('stop' in node && typeof (node as AudioScheduledSourceNode).stop === 'function') {
-          (node as AudioScheduledSourceNode).stop();
-        }
-        node.disconnect();
-      } catch {
-        // ignore
-      }
-    });
-    ambientNodesRef.current = [];
-  }, []);
-
-  const startAmbientSound = useCallback((type: AmbientSoundType) => {
-    stopAmbientSound();
-    if (type === 'none' || typeof window === 'undefined') return;
-
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!audioCtxRef.current) audioCtxRef.current = new AudioCtx();
-      const ctx = audioCtxRef.current;
-
-      const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(ambientVolume, ctx.currentTime);
-      masterGain.connect(ctx.destination);
-      ambientGainNodeRef.current = masterGain;
-
-      const bufferSize = ctx.sampleRate * 2;
-      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
-      }
-
-      const whiteNoise = ctx.createBufferSource();
-      whiteNoise.buffer = noiseBuffer;
-      whiteNoise.loop = true;
-
-      if (type === 'rain') {
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(1000, ctx.currentTime);
-        whiteNoise.connect(filter);
-        filter.connect(masterGain);
-        whiteNoise.start();
-        ambientNodesRef.current.push(whiteNoise, filter);
-      } else if (type === 'waves') {
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(400, ctx.currentTime);
-
-        const lfo = ctx.createOscillator();
-        lfo.frequency.setValueAtTime(0.2, ctx.currentTime);
-        const lfoGain = ctx.createGain();
-        lfoGain.gain.setValueAtTime(300, ctx.currentTime);
-        lfo.connect(lfoGain);
-        lfoGain.connect(filter.frequency);
-
-        whiteNoise.connect(filter);
-        filter.connect(masterGain);
-        lfo.start();
-        whiteNoise.start();
-        ambientNodesRef.current.push(whiteNoise, filter, lfo, lfoGain);
-      } else if (type === 'space') {
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(180, ctx.currentTime);
-        whiteNoise.connect(filter);
-        filter.connect(masterGain);
-        whiteNoise.start();
-        ambientNodesRef.current.push(whiteNoise, filter);
-      } else if (type === 'cafe') {
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(800, ctx.currentTime);
-        filter.Q.setValueAtTime(1.5, ctx.currentTime);
-        whiteNoise.connect(filter);
-        filter.connect(masterGain);
-        whiteNoise.start();
-        ambientNodesRef.current.push(whiteNoise, filter);
-      }
-    } catch (e) {
-      console.error('Failed to start ambient audio', e);
-    }
-  }, [ambientVolume, stopAmbientSound]);
-
-  useEffect(() => {
-    if (isRunning && ambientSound !== 'none') {
-      startAmbientSound(ambientSound);
-    } else {
-      stopAmbientSound();
-    }
-    return () => stopAmbientSound();
-  }, [isRunning, ambientSound, startAmbientSound, stopAmbientSound]);
-
-  useEffect(() => {
-    if (ambientGainNodeRef.current && audioCtxRef.current) {
-      ambientGainNodeRef.current.gain.setValueAtTime(ambientVolume, audioCtxRef.current.currentTime);
-    }
-  }, [ambientVolume]);
-
-  // Play / Pause Toggle
-  const togglePlay = () => {
-    if (!isRunning) {
-      if (settings.soundEnabled) playAudioChime('start');
-      setHasSessionStarted(true);
-
-      if (isInterrupted && wastedSeconds > 0) {
-        saveInterruptedWasteSession(wastedSeconds, mode, activeTask?.title, overdueBreakMode);
-        setWastedSeconds(0);
-        setIsInterrupted(false);
-        setOverdueBreakMode(null);
-      }
-      setIsRunning(true);
-    } else {
-      if (settings.soundEnabled) playAudioChime('pause');
-      setIsRunning(false);
-
-      if (hasSessionStarted) {
-        setIsInterrupted(true);
-      }
-    }
-  };
-
-  const handleReset = () => {
-    if (isInterrupted && wastedSeconds > 0) {
-      saveInterruptedWasteSession(wastedSeconds, mode, activeTask?.title, overdueBreakMode);
-      setWastedSeconds(0);
-      setIsInterrupted(false);
-      setOverdueBreakMode(null);
-    }
-    setHasSessionStarted(false);
-    setIsRunning(false);
-    setTimeLeft(getModeDurationSeconds(mode));
-  };
-
-  const handleSkip = () => {
-    if (isInterrupted && wastedSeconds > 0) {
-      saveInterruptedWasteSession(wastedSeconds, mode, activeTask?.title, overdueBreakMode);
-      setWastedSeconds(0);
-      setIsInterrupted(false);
-      setOverdueBreakMode(null);
-    }
-    setHasSessionStarted(false);
-    setIsRunning(false);
-    if (mode === 'work') switchMode('shortBreak');
-    else switchMode('work');
-  };
-
-  const adjustTime = (deltaMinutes: number) => {
-    setTimeLeft(prev => Math.max(60, prev + deltaMinutes * 60));
-  };
-
-  // Save Settings
-  const saveSettings = (newSettings: TimerSettings) => {
-    setSettings(newSettings);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dt_pomodoro_settings', JSON.stringify(newSettings));
-    }
-    if (!isRunning) {
-      setTimeLeft(getModeDurationSeconds(mode, newSettings));
-    }
-    setIsSettingsOpen(false);
-  };
 
   // Progress & Theme Computations
   const totalSeconds = getModeDurationSeconds(mode);
@@ -699,18 +76,9 @@ export default function PomodoroPage() {
     .filter(s => s.mode === 'work')
     .reduce((acc, s) => acc + s.durationMinutes, 0);
 
-  const formatSecsToMMSS = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const getModeTitle = (m: TimerMode) => {
-    switch (m) {
-      case 'work': return 'Focus Session';
-      case 'shortBreak': return 'Short Break';
-      case 'longBreak': return 'Long Break';
-    }
+  const handleSaveSettingsAndClose = (newSettings: TimerSettings) => {
+    saveSettings(newSettings);
+    setIsSettingsOpen(false);
   };
 
   return (
@@ -786,7 +154,7 @@ export default function PomodoroPage() {
                   </div>
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                  Customizable themes, background styles, focus sound engine &amp; time waste tracking
+                  Runs seamlessly across all app tabs • Clock ticking audio, transition bells &amp; time waste tracking
                 </p>
               </div>
             </div>
@@ -794,6 +162,52 @@ export default function PomodoroPage() {
 
           {/* Controls Bar Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Clock Ticking Toggle */}
+            <button
+              onClick={() => {
+                const newTick = !settings.tickingEnabled;
+                saveSettings({ ...settings, tickingEnabled: newTick });
+              }}
+              className="btn btn-secondary"
+              style={{
+                padding: '8px 14px',
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: settings.tickingEnabled ? 'rgba(245,158,11,0.15)' : undefined,
+                borderColor: settings.tickingEnabled ? 'rgba(245,158,11,0.4)' : undefined,
+                color: settings.tickingEnabled ? '#f59e0b' : 'var(--text-secondary)'
+              }}
+              title={settings.tickingEnabled ? 'Disable Clock Ticking' : 'Enable Clock Ticking'}
+            >
+              <Clock size={17} />
+              <span style={{ fontSize: 13 }}>{settings.tickingEnabled ? 'Tick-Tock On' : 'Tick Off'}</span>
+            </button>
+
+            {/* Bell Ring Toggle */}
+            <button
+              onClick={() => {
+                const newBell = !settings.bellEnabled;
+                saveSettings({ ...settings, bellEnabled: newBell });
+              }}
+              className="btn btn-secondary"
+              style={{
+                padding: '8px 14px',
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: settings.bellEnabled ? 'rgba(6,186,212,0.15)' : undefined,
+                borderColor: settings.bellEnabled ? 'rgba(6,186,212,0.4)' : undefined,
+                color: settings.bellEnabled ? '#06b6d4' : 'var(--text-secondary)'
+              }}
+              title={settings.bellEnabled ? 'Disable Transition Bell' : 'Enable Transition Bell'}
+            >
+              <BellRing size={17} />
+              <span style={{ fontSize: 13 }}>{settings.bellEnabled ? 'Zen Bell On' : 'Bell Off'}</span>
+            </button>
+
             <button
               onClick={() => setZenMode(true)}
               className="btn btn-secondary"
@@ -805,25 +219,12 @@ export default function PomodoroPage() {
             </button>
 
             <button
-              onClick={() => {
-                const newSound = !settings.soundEnabled;
-                saveSettings({ ...settings, soundEnabled: newSound });
-              }}
-              className="btn btn-secondary"
-              style={{ padding: '8px 14px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 8 }}
-              title={settings.soundEnabled ? 'Mute Chimes' : 'Enable Chimes'}
-            >
-              {settings.soundEnabled ? <Volume2 size={17} color="var(--accent)" /> : <VolumeX size={17} color="var(--text-muted)" />}
-              <span style={{ fontSize: 13 }}>{settings.soundEnabled ? 'Chime On' : 'Muted'}</span>
-            </button>
-
-            <button
               onClick={() => setIsSettingsOpen(true)}
               className="btn btn-secondary"
               style={{ padding: '8px 14px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 8 }}
             >
               <Settings size={17} color="var(--text-secondary)" />
-              <span style={{ fontSize: 13 }}>Settings &amp; Themes</span>
+              <span style={{ fontSize: 13 }}>Settings</span>
             </button>
           </div>
         </div>
@@ -1388,7 +789,7 @@ export default function PomodoroPage() {
           </div>
         )}
 
-        {/* ── Ambient Sound Synthesizer Bar ────────────────────────── */}
+        {/* ── Ambient & Clock Sound Synthesizer Bar ──────────────── */}
         {!zenMode && (
           <div style={{
             marginTop: 32,
@@ -1397,68 +798,121 @@ export default function PomodoroPage() {
             background: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
             display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12
+            flexDirection: 'column',
+            gap: 14
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Music size={17} color="var(--accent-2)" />
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                Focus Ambient Generator:
-              </span>
+            {/* Ambient Sound Selector */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Music size={17} color="var(--accent-2)" />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Focus Audio Engine:
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {[
+                  { key: 'none', label: 'Off', icon: VolumeX },
+                  { key: 'clock', label: 'Clock Ticking', icon: Clock },
+                  { key: 'rain', label: 'Rain', icon: CloudRain },
+                  { key: 'waves', label: 'Ocean Waves', icon: Waves },
+                  { key: 'space', label: 'Deep Space', icon: Wind },
+                  { key: 'cafe', label: 'Coffee Shop', icon: Coffee },
+                ].map(sound => {
+                  const Icon = sound.icon;
+                  const isActive = ambientSound === sound.key;
+                  return (
+                    <button
+                      key={sound.key}
+                      onClick={() => setAmbientSound(sound.key as AmbientSoundType)}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: 10,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        border: '1px solid',
+                        borderColor: isActive ? 'var(--accent-2)' : 'transparent',
+                        background: isActive ? 'rgba(6, 186, 212, 0.15)' : 'var(--bg-card)',
+                        color: isActive ? 'var(--accent-2)' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      <Icon size={14} />
+                      <span>{sound.label}</span>
+                    </button>
+                  );
+                })}
+
+                {ambientSound !== 'none' && ambientSound !== 'clock' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                    <Volume2 size={14} color="var(--text-muted)" />
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="0.8"
+                      step="0.05"
+                      value={ambientVolume}
+                      onChange={e => setAmbientVolume(parseFloat(e.target.value))}
+                      style={{ width: 70, accentColor: 'var(--accent-2)', cursor: 'pointer' }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              {[
-                { key: 'none', label: 'Off', icon: VolumeX },
-                { key: 'rain', label: 'Rain', icon: CloudRain },
-                { key: 'waves', label: 'Ocean Waves', icon: Waves },
-                { key: 'space', label: 'Deep Space', icon: Wind },
-                { key: 'cafe', label: 'Coffee Shop', icon: Coffee },
-              ].map(sound => {
-                const Icon = sound.icon;
-                const isActive = ambientSound === sound.key;
-                return (
-                  <button
-                    key={sound.key}
-                    onClick={() => setAmbientSound(sound.key as AmbientSoundType)}
-                    style={{
-                      padding: '5px 12px',
-                      borderRadius: 10,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      border: '1px solid',
-                      borderColor: isActive ? 'var(--accent-2)' : 'transparent',
-                      background: isActive ? 'rgba(6, 186, 212, 0.15)' : 'var(--bg-card)',
-                      color: isActive ? 'var(--accent-2)' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6
-                    }}
-                  >
-                    <Icon size={14} />
-                    <span>{sound.label}</span>
-                  </button>
-                );
-              })}
-
-              {ambientSound !== 'none' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
-                  <Volume2 size={14} color="var(--text-muted)" />
-                  <input
-                    type="range"
-                    min="0.05"
-                    max="0.8"
-                    step="0.05"
-                    value={ambientVolume}
-                    onChange={e => setAmbientVolume(parseFloat(e.target.value))}
-                    style={{ width: 70, accentColor: 'var(--accent-2)', cursor: 'pointer' }}
-                  />
+            {/* ── Clock Sound Style Selector Bar ────────────────────── */}
+            {(settings.tickingEnabled || ambientSound === 'clock') && (
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                paddingTop: 10,
+                borderTop: '1px solid var(--border)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <Sliders size={14} color="#f59e0b" />
+                  <span>Clock Ticking Style:</span>
                 </div>
-              )}
-            </div>
+
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {(Object.keys(CLOCK_STYLES) as ClockSoundStyle[]).map(styleKey => {
+                    const info = CLOCK_STYLES[styleKey];
+                    const isSelected = (settings.clockStyle || 'classic') === styleKey;
+                    return (
+                      <button
+                        key={styleKey}
+                        onClick={() => saveSettings({ ...settings, clockStyle: styleKey })}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 8,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          border: '1px solid',
+                          borderColor: isSelected ? '#f59e0b' : 'var(--border)',
+                          background: isSelected ? 'rgba(245, 158, 11, 0.15)' : 'var(--bg-card)',
+                          color: isSelected ? '#f59e0b' : 'var(--text-secondary)',
+                          cursor: 'pointer'
+                        }}
+                        title={info.description}
+                      >
+                        {info.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1891,7 +1345,7 @@ export default function PomodoroPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Settings size={20} color="var(--accent)" />
                 <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                  Timer &amp; Theme Settings
+                  Timer &amp; Audio Settings
                 </h3>
               </div>
               <button
@@ -1904,6 +1358,66 @@ export default function PomodoroPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {/* Audio Controls */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Audio &amp; Sounds
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Clock Ticking Sound</span>
+                    <input
+                      type="checkbox"
+                      checked={settings.tickingEnabled}
+                      onChange={e => saveSettings({ ...settings, tickingEnabled: e.target.checked })}
+                      style={{ accentColor: 'var(--accent)', width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                  </label>
+
+                  {/* Clock Ticking Style selector */}
+                  {settings.tickingEnabled && (
+                    <div style={{ paddingLeft: 12, borderLeft: '2px solid var(--accent)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Clock Ticking Sound Style:</span>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        {(Object.keys(CLOCK_STYLES) as ClockSoundStyle[]).map(styleKey => {
+                          const isSelected = (settings.clockStyle || 'classic') === styleKey;
+                          return (
+                            <button
+                              key={styleKey}
+                              onClick={() => saveSettings({ ...settings, clockStyle: styleKey })}
+                              style={{
+                                padding: '6px 8px',
+                                borderRadius: 8,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                background: 'var(--bg-secondary)',
+                                border: '1px solid',
+                                borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                                color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                              }}
+                            >
+                              {CLOCK_STYLES[styleKey].name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Transition Zen Bell Ringing</span>
+                    <input
+                      type="checkbox"
+                      checked={settings.bellEnabled}
+                      onChange={e => saveSettings({ ...settings, bellEnabled: e.target.checked })}
+                      style={{ accentColor: 'var(--accent)', width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                  </label>
+                </div>
+              </div>
+
               {/* Color Theme Selector */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -1985,7 +1499,7 @@ export default function PomodoroPage() {
                     min="1"
                     max="120"
                     value={settings.workDuration}
-                    onChange={e => setSettings({ ...settings, workDuration: parseInt(e.target.value) || 25 })}
+                    onChange={e => saveSettings({ ...settings, workDuration: parseInt(e.target.value) || 25 })}
                     style={{
                       width: '100%',
                       padding: '8px 10px',
@@ -2007,7 +1521,7 @@ export default function PomodoroPage() {
                     min="1"
                     max="60"
                     value={settings.shortBreakDuration}
-                    onChange={e => setSettings({ ...settings, shortBreakDuration: parseInt(e.target.value) || 5 })}
+                    onChange={e => saveSettings({ ...settings, shortBreakDuration: parseInt(e.target.value) || 5 })}
                     style={{
                       width: '100%',
                       padding: '8px 10px',
@@ -2029,7 +1543,7 @@ export default function PomodoroPage() {
                     min="1"
                     max="60"
                     value={settings.longBreakDuration}
-                    onChange={e => setSettings({ ...settings, longBreakDuration: parseInt(e.target.value) || 15 })}
+                    onChange={e => saveSettings({ ...settings, longBreakDuration: parseInt(e.target.value) || 15 })}
                     style={{
                       width: '100%',
                       padding: '8px 10px',
@@ -2052,7 +1566,7 @@ export default function PomodoroPage() {
                   min="1"
                   max="12"
                   value={settings.longBreakInterval}
-                  onChange={e => setSettings({ ...settings, longBreakInterval: parseInt(e.target.value) || 4 })}
+                  onChange={e => saveSettings({ ...settings, longBreakInterval: parseInt(e.target.value) || 4 })}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -2071,7 +1585,7 @@ export default function PomodoroPage() {
                   <input
                     type="checkbox"
                     checked={settings.autoStartBreaks}
-                    onChange={e => setSettings({ ...settings, autoStartBreaks: e.target.checked })}
+                    onChange={e => saveSettings({ ...settings, autoStartBreaks: e.target.checked })}
                     style={{ accentColor: 'var(--accent)', width: 16, height: 16, cursor: 'pointer' }}
                   />
                 </label>
@@ -2081,7 +1595,7 @@ export default function PomodoroPage() {
                   <input
                     type="checkbox"
                     checked={settings.autoStartPomodoros}
-                    onChange={e => setSettings({ ...settings, autoStartPomodoros: e.target.checked })}
+                    onChange={e => saveSettings({ ...settings, autoStartPomodoros: e.target.checked })}
                     style={{ accentColor: 'var(--accent)', width: 16, height: 16, cursor: 'pointer' }}
                   />
                 </label>
@@ -2089,11 +1603,11 @@ export default function PomodoroPage() {
 
               <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
                 <button
-                  onClick={() => saveSettings(settings)}
+                  onClick={() => setIsSettingsOpen(false)}
                   className="btn btn-primary"
                   style={{ flex: 1, padding: '10px 0', borderRadius: 10, justifyContent: 'center' }}
                 >
-                  Save Settings
+                  Save &amp; Close
                 </button>
               </div>
             </div>
