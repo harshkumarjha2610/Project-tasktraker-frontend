@@ -6,7 +6,7 @@ import {
   CheckCircle2, Flame, Award, Clock, Sparkles, Target, X, Check,
   Maximize2, Minimize2, Plus, Minus, Zap, CloudRain, Waves, Wind,
   Coffee, Music, RefreshCw, Trophy, Quote, AlertTriangle, ShieldAlert,
-  Palette, BellRing, Sliders
+  Palette, BellRing, Sliders, Calendar
 } from 'lucide-react';
 import { useTaskContext } from '@/context/TaskContext';
 import {
@@ -39,10 +39,32 @@ export default function PomodoroPage() {
     ambientSound, setAmbientSound,
     ambientVolume, setAmbientVolume,
     quoteIndex, setQuoteIndex,
-    formatSecsToMMSS, getModeTitle, getModeDurationSeconds
+    formatSecsToMMSS, formatSecsToHoursMins, getModeTitle, getModeDurationSeconds
   } = usePomodoroContext();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<'today' | 'yesterday' | 'week' | 'all'>('today');
+
+  const filterByDate = <T extends { completedAt?: string; interruptedAt?: string }>(items: T[]) => {
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    const sevenDaysAgo = Date.now() - 7 * 86400000;
+
+    return items.filter(item => {
+      const dateStr = item.completedAt || item.interruptedAt;
+      if (!dateStr) return true;
+      const itemDate = new Date(dateStr);
+      const itemDateStr = itemDate.toDateString();
+
+      if (historyFilter === 'today') return itemDateStr === today;
+      if (historyFilter === 'yesterday') return itemDateStr === yesterday;
+      if (historyFilter === 'week') return itemDate.getTime() >= sevenDaysAgo;
+      return true;
+    });
+  };
+
+  const filteredHistory = filterByDate(history);
+  const filteredWasteHistory = filterByDate(wasteHistory);
 
   const activeTask = filteredTasks.find(t => t.id === selectedTaskId);
 
@@ -76,9 +98,11 @@ export default function PomodoroPage() {
     .filter(s => s.mode === 'work')
     .reduce((acc, s) => acc + s.durationMinutes, 0);
 
-  const handleSaveSettingsAndClose = (newSettings: TimerSettings) => {
-    saveSettings(newSettings);
-    setIsSettingsOpen(false);
+  const formatItemTimestamp = (isoStr: string) => {
+    const d = new Date(isoStr);
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (historyFilter === 'today') return timeStr;
+    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
   };
 
   return (
@@ -154,7 +178,7 @@ export default function PomodoroPage() {
                   </div>
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                  Runs seamlessly across all app tabs • Clock ticking audio, transition bells &amp; time waste tracking
+                  Auto-resets stats at midnight • Full date-wise history archives &amp; time waste tracking
                 </p>
               </div>
             </div>
@@ -782,7 +806,7 @@ export default function PomodoroPage() {
                 color: '#ef4444',
                 fontFamily: 'Inter, monospace'
               }}>
-                {formatSecsToMMSS(wastedSeconds)}
+                {formatSecsToHoursMins(wastedSeconds)}
               </span>
               <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>WASTED</span>
             </div>
@@ -1146,10 +1170,10 @@ export default function PomodoroPage() {
             </div>
             <div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#ef4444' }}>
-                {Math.floor((totalWastedSecondsToday + wastedSeconds) / 60)}m {(totalWastedSecondsToday + wastedSeconds) % 60}s
+                {formatSecsToHoursMins(totalWastedSecondsToday + wastedSeconds)}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Time Wasted (Interrupted / Overdue)
+                Time Wasted Today
               </div>
             </div>
           </div>
@@ -1158,163 +1182,213 @@ export default function PomodoroPage() {
 
       {/* ── Sessions & Interruption History Log ────────────────────── */}
       {!zenMode && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-          {/* Completed Sessions Log */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Date Filter Bar */}
           <div style={{
             background: 'var(--bg-card)',
-            borderRadius: 20,
+            borderRadius: 16,
             border: '1px solid var(--border)',
-            padding: '24px'
+            padding: '12px 18px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12
           }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 18
-            }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                Completed Sessions
-              </h3>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {history.length} recorded
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Calendar size={16} color="var(--accent)" />
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                Date-Wise History Archives:
               </span>
             </div>
 
-            {history.length === 0 ? (
-              <div style={{
-                padding: '36px 0',
-                textAlign: 'center',
-                color: 'var(--text-muted)',
-                fontSize: 14
-              }}>
-                No sessions completed yet today. Hit &quot;Start Flow&quot; above!
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {history.slice(0, 8).map(s => (
-                  <div
-                    key={s.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      borderRadius: 12,
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <CheckCircle2
-                        size={18}
-                        color={s.mode === 'work' ? '#8b5cf6' : s.mode === 'shortBreak' ? '#06b6d4' : '#f59e0b'}
-                      />
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                          {s.taskTitle ? s.taskTitle : (s.mode === 'work' ? 'Focus Session' : s.mode === 'shortBreak' ? 'Short Break' : 'Long Break')}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {new Date(s.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      padding: '4px 10px',
-                      borderRadius: 8,
-                      background: s.mode === 'work' ? 'rgba(139,92,246,0.15)' : 'rgba(6,186,212,0.15)',
-                      color: s.mode === 'work' ? '#8b5cf6' : '#06b6d4'
-                    }}>
-                      +{s.durationMinutes} mins
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {[
+                { key: 'today', label: 'Today' },
+                { key: 'yesterday', label: 'Yesterday' },
+                { key: 'week', label: 'Past 7 Days' },
+                { key: 'all', label: 'All Time Archives' }
+              ].map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setHistoryFilter(f.key as any)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: '1px solid',
+                    borderColor: historyFilter === f.key ? 'var(--accent)' : 'transparent',
+                    background: historyFilter === f.key ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)',
+                    color: historyFilter === f.key ? 'var(--accent)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Time Waste Interruptions Log */}
-          <div style={{
-            background: 'var(--bg-card)',
-            borderRadius: 20,
-            border: '1px solid rgba(239,68,68,0.25)',
-            padding: '24px'
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+            {/* Completed Sessions Log */}
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 18
+              background: 'var(--bg-card)',
+              borderRadius: 20,
+              border: '1px solid var(--border)',
+              padding: '24px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertTriangle size={18} color="#ef4444" />
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#ef4444' }}>
-                  Time Waste Interruptions &amp; Delays
-                </h3>
-              </div>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {wasteHistory.length} logged
-              </span>
-            </div>
-
-            {wasteHistory.length === 0 ? (
               <div style={{
-                padding: '36px 0',
-                textAlign: 'center',
-                color: 'var(--text-muted)',
-                fontSize: 14
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 18
               }}>
-                🎉 Zero interruptions logged! Keep up the continuous focus flow.
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Completed Sessions
+                </h3>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {filteredHistory.length} recorded
+                </span>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {wasteHistory.slice(0, 8).map(w => (
-                  <div
-                    key={w.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      borderRadius: 12,
-                      background: 'rgba(239,68,68,0.06)',
-                      border: '1px solid rgba(239,68,68,0.2)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <ShieldAlert size={18} color="#ef4444" />
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                          {w.isOverdueDelay
-                            ? 'Overdue Return After Break'
-                            : w.mode === 'work'
-                            ? (w.taskTitle ? `Interrupted: "${w.taskTitle}"` : 'Interrupted Focus Session')
-                            : w.mode === 'shortBreak'
-                            ? 'Interrupted Short Break'
-                            : 'Interrupted Long Break'}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {new Date(w.interruptedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+
+              {filteredHistory.length === 0 ? (
+                <div style={{
+                  padding: '36px 0',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                  fontSize: 14
+                }}>
+                  No completed sessions found for this date view.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {filteredHistory.slice(0, 10).map(s => (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        borderRadius: 12,
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <CheckCircle2
+                          size={18}
+                          color={s.mode === 'work' ? '#8b5cf6' : s.mode === 'shortBreak' ? '#06b6d4' : '#f59e0b'}
+                        />
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {s.taskTitle ? s.taskTitle : (s.mode === 'work' ? 'Focus Session' : s.mode === 'shortBreak' ? 'Short Break' : 'Long Break')}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {formatItemTimestamp(s.completedAt)}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      padding: '4px 10px',
-                      borderRadius: 8,
-                      background: 'rgba(239,68,68,0.15)',
-                      color: '#ef4444'
-                    }}>
-                      -{Math.floor(w.durationSeconds / 60)}m {w.durationSeconds % 60}s
+                      <div style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: '4px 10px',
+                        borderRadius: 8,
+                        background: s.mode === 'work' ? 'rgba(139,92,246,0.15)' : 'rgba(6,186,212,0.15)',
+                        color: s.mode === 'work' ? '#8b5cf6' : '#06b6d4'
+                      }}>
+                        +{s.durationMinutes} mins
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Time Waste Interruptions Log */}
+            <div style={{
+              background: 'var(--bg-card)',
+              borderRadius: 20,
+              border: '1px solid rgba(239,68,68,0.25)',
+              padding: '24px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 18
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle size={18} color="#ef4444" />
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: '#ef4444' }}>
+                    Time Waste Interruptions &amp; Delays
+                  </h3>
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {filteredWasteHistory.length} logged
+                </span>
               </div>
-            )}
+
+              {filteredWasteHistory.length === 0 ? (
+                <div style={{
+                  padding: '36px 0',
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                  fontSize: 14
+                }}>
+                  🎉 Zero interruptions logged for this date view!
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {filteredWasteHistory.slice(0, 10).map(w => (
+                    <div
+                      key={w.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 16px',
+                        borderRadius: 12,
+                        background: 'rgba(239,68,68,0.06)',
+                        border: '1px solid rgba(239,68,68,0.2)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <ShieldAlert size={18} color="#ef4444" />
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {w.isOverdueDelay
+                              ? 'Overdue Return After Break'
+                              : w.mode === 'work'
+                              ? (w.taskTitle ? `Interrupted: "${w.taskTitle}"` : 'Interrupted Focus Session')
+                              : w.mode === 'shortBreak'
+                              ? 'Interrupted Short Break'
+                              : 'Interrupted Long Break'}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {formatItemTimestamp(w.interruptedAt)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: '4px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(239,68,68,0.15)',
+                        color: '#ef4444'
+                      }}>
+                        -{formatSecsToHoursMins(w.durationSeconds)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

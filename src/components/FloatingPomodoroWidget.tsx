@@ -17,6 +17,7 @@ export default function FloatingPomodoroWidget() {
     togglePlay,
     colorTheme,
     formatSecsToMMSS,
+    formatSecsToHoursMins,
     getModeTitle
   } = usePomodoroContext();
 
@@ -80,7 +81,7 @@ export default function FloatingPomodoroWidget() {
             fontFamily: 'Inter, monospace',
             lineHeight: 1.1
           }}>
-            {isInterrupted ? formatSecsToMMSS(wastedSeconds) : formatSecsToMMSS(timeLeft)}
+            {isInterrupted ? formatSecsToHoursMins(wastedSeconds) : formatSecsToMMSS(timeLeft)}
             <span style={{ fontSize: 10, marginLeft: 4, fontWeight: 600, opacity: 0.8 }}>
               {isInterrupted ? 'WASTED' : 'LEFT'}
             </span>

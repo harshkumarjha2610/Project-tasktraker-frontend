@@ -346,6 +346,8 @@ interface PomodoroContextType {
   quoteIndex: number;
   setQuoteIndex: React.Dispatch<React.SetStateAction<number>>;
   formatSecsToMMSS: (sec: number) => string;
+  formatSecsToHoursMins: (sec: number) => string;
+  formatSecsToHHMMSS: (sec: number) => string;
   getModeTitle: (m: TimerMode) => string;
   getModeDurationSeconds: (m: TimerMode, customSettings?: TimerSettings) => number;
 }
@@ -394,6 +396,34 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
   }, [settings]);
 
+  // Automatic Midnight (12:00 AM) Rollover Check & Daily Stats Calculation
+  const recalculateDailyStats = useCallback((allHistory: PomodoroSession[], allWaste: WastedSessionRecord[]) => {
+    const todayStr = new Date().toDateString();
+    
+    // Count today's completed work pomodoros
+    const todayWorkCount = allHistory.filter(s =>
+      s.mode === 'work' && new Date(s.completedAt).toDateString() === todayStr
+    ).length;
+    setCompletedSessionsCount(todayWorkCount);
+
+    // Sum today's wasted seconds
+    const todayWasteTotal = allWaste
+      .filter(w => new Date(w.interruptedAt).toDateString() === todayStr)
+      .reduce((acc, w) => acc + w.durationSeconds, 0);
+    setTotalWastedSecondsToday(todayWasteTotal);
+  }, []);
+
+  // Periodic Midnight Check interval (runs every 10 seconds to auto-refresh at midnight 12:00 AM)
+  useEffect(() => {
+    const checkRollover = () => {
+      recalculateDailyStats(history, wasteHistory);
+    };
+
+    checkRollover();
+    const midnightInterval = setInterval(checkRollover, 10000);
+    return () => clearInterval(midnightInterval);
+  }, [history, wasteHistory, recalculateDailyStats]);
+
   // Load saved data from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -418,39 +448,34 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         setBgStyle(savedBgStyle);
       }
 
+      let parsedHistory: PomodoroSession[] = [];
       const savedHistory = localStorage.getItem('dt_pomodoro_history');
       if (savedHistory) {
         try {
-          const parsedHistory = JSON.parse(savedHistory);
+          parsedHistory = JSON.parse(savedHistory);
           setHistory(parsedHistory);
-          const todayStr = new Date().toDateString();
-          const todayWorkCount = parsedHistory.filter((s: PomodoroSession) =>
-            s.mode === 'work' && new Date(s.completedAt).toDateString() === todayStr
-          ).length;
-          setCompletedSessionsCount(todayWorkCount);
         } catch (e) {
           console.error('Failed to parse pomodoro history', e);
         }
       }
 
+      let parsedWaste: WastedSessionRecord[] = [];
       const savedWasteHistory = localStorage.getItem('dt_pomodoro_waste_history');
       if (savedWasteHistory) {
         try {
-          const parsedWaste = JSON.parse(savedWasteHistory);
+          parsedWaste = JSON.parse(savedWasteHistory);
           setWasteHistory(parsedWaste);
-          const todayStr = new Date().toDateString();
-          const todayWasteTotal = parsedWaste
-            .filter((w: WastedSessionRecord) => new Date(w.interruptedAt).toDateString() === todayStr)
-            .reduce((acc: number, w: WastedSessionRecord) => acc + w.durationSeconds, 0);
-          setTotalWastedSecondsToday(todayWasteTotal);
         } catch (e) {
           console.error('Failed to parse waste history', e);
         }
       }
 
+      // Initial stats recalculation based on current date
+      recalculateDailyStats(parsedHistory, parsedWaste);
+
       setQuoteIndex(Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length));
     }
-  }, []);
+  }, [recalculateDailyStats]);
 
   const changeColorTheme = (t: PomodoroThemeColor) => {
     setColorTheme(t);
@@ -526,7 +551,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Interrupted / Overdue Wasted Time Ticker Interval (Runs in Global Context!)
+  // Interrupted / Overdue Wasted Time Ticker Interval
   useEffect(() => {
     let wasteInterval: NodeJS.Timeout | null = null;
     if (isInterrupted) {
@@ -631,7 +656,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, selectedTaskId, completedSessionsCount, switchMode]);
 
-  // Global Timer Tick Interval (Runs continuously in App Provider!)
+  // Global Timer Tick Interval
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -674,9 +699,13 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     const modeName = mode === 'work' ? 'Focus' : mode === 'shortBreak' ? 'Short Break' : 'Long Break';
 
     if (isInterrupted) {
-      const wMins = Math.floor(wastedSeconds / 60);
+      const wHours = Math.floor(wastedSeconds / 3600);
+      const wMins = Math.floor((wastedSeconds % 3600) / 60);
       const wSecs = wastedSeconds % 60;
-      const wFormatted = `${wMins.toString().padStart(2, '0')}:${wSecs.toString().padStart(2, '0')}`;
+      const wFormatted = wHours > 0
+        ? `${wHours}h ${wMins}m ${wSecs}s`
+        : `${wMins.toString().padStart(2, '0')}:${wSecs.toString().padStart(2, '0')}`;
+
       if (overdueBreakMode) {
         document.title = `🚨 (${wFormatted} Wasted) Overdue Focus Return - DailyTask`;
       } else {
@@ -867,6 +896,28 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const formatSecsToHoursMins = (sec: number) => {
+    const hours = Math.floor(sec / 3600);
+    const mins = Math.floor((sec % 3600) / 60);
+    const secs = sec % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${mins}m ${secs}s`;
+    }
+    return `${mins}m ${secs}s`;
+  };
+
+  const formatSecsToHHMMSS = (sec: number) => {
+    const hours = Math.floor(sec / 3600);
+    const mins = Math.floor((sec % 3600) / 60);
+    const secs = sec % 60;
+
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const getModeTitle = (m: TimerMode) => {
     switch (m) {
       case 'work': return 'Focus Session';
@@ -892,7 +943,8 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       ambientSound, setAmbientSound,
       ambientVolume, setAmbientVolume,
       quoteIndex, setQuoteIndex,
-      formatSecsToMMSS, getModeTitle, getModeDurationSeconds
+      formatSecsToMMSS, formatSecsToHoursMins, formatSecsToHHMMSS,
+      getModeTitle, getModeDurationSeconds
     }}>
       {children}
     </PomodoroContext.Provider>
