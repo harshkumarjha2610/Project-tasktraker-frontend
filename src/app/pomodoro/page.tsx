@@ -6,7 +6,7 @@ import {
   CheckCircle2, Flame, Award, Clock, Sparkles, Target, X, Check,
   Maximize2, Minimize2, Plus, Minus, Zap, CloudRain, Waves, Wind,
   Coffee, Music, RefreshCw, Trophy, Quote, AlertTriangle, ShieldAlert,
-  Palette, BellRing, Sliders, Calendar
+  Palette, BellRing, Sliders, Calendar, Filter
 } from 'lucide-react';
 import { useTaskContext } from '@/context/TaskContext';
 import {
@@ -22,6 +22,8 @@ import {
   ClockSoundStyle,
   TimerSettings
 } from '@/context/PomodoroContext';
+
+type HistoryDateFilter = 'today' | 'yesterday' | 'week' | 'custom' | 'all';
 
 export default function PomodoroPage() {
   const { filteredTasks, toggleComplete } = useTaskContext();
@@ -43,8 +45,10 @@ export default function PomodoroPage() {
   } = usePomodoroContext();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState<'today' | 'yesterday' | 'week' | 'all'>('today');
+  const [historyFilter, setHistoryFilter] = useState<HistoryDateFilter>('today');
+  const [customDate, setCustomDate] = useState<string>('');
 
+  // Date Filter Logic
   const filterByDate = <T extends { completedAt?: string; interruptedAt?: string }>(items: T[]) => {
     const today = new Date().toDateString();
     const yesterday = new Date(Date.now() - 86400000).toDateString();
@@ -59,12 +63,36 @@ export default function PomodoroPage() {
       if (historyFilter === 'today') return itemDateStr === today;
       if (historyFilter === 'yesterday') return itemDateStr === yesterday;
       if (historyFilter === 'week') return itemDate.getTime() >= sevenDaysAgo;
+      if (historyFilter === 'custom' && customDate) {
+        const customDateObj = new Date(customDate + 'T00:00:00');
+        return itemDateStr === customDateObj.toDateString();
+      }
       return true;
     });
   };
 
   const filteredHistory = filterByDate(history);
   const filteredWasteHistory = filterByDate(wasteHistory);
+
+  // Dynamic Date-Wise Statistics Computation
+  const selectedFocusMins = filteredHistory
+    .filter(s => s.mode === 'work')
+    .reduce((acc, s) => acc + s.durationMinutes, 0);
+
+  const selectedPomodoroCount = filteredHistory.filter(s => s.mode === 'work').length;
+
+  const selectedWastedSecs = filteredWasteHistory.reduce((acc, w) => acc + w.durationSeconds, 0)
+    + (historyFilter === 'today' ? wastedSeconds : 0);
+
+  const getFilterLabel = () => {
+    switch (historyFilter) {
+      case 'today': return 'Today';
+      case 'yesterday': return 'Yesterday';
+      case 'week': return 'Past 7 Days';
+      case 'custom': return customDate ? new Date(customDate + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Custom Date';
+      case 'all': return 'All Time Archives';
+    }
+  };
 
   const activeTask = filteredTasks.find(t => t.id === selectedTaskId);
 
@@ -91,12 +119,6 @@ export default function PomodoroPage() {
   const xpEarned = completedSessionsCount * 50;
   const currentLevel = Math.floor(xpEarned / 200) + 1;
   const xpInCurrentLevel = xpEarned % 200;
-
-  const todayStr = new Date().toDateString();
-  const todaySessions = history.filter(s => new Date(s.completedAt).toDateString() === todayStr);
-  const totalFocusMinsToday = todaySessions
-    .filter(s => s.mode === 'work')
-    .reduce((acc, s) => acc + s.durationMinutes, 0);
 
   const formatItemTimestamp = (isoStr: string) => {
     const d = new Date(isoStr);
@@ -178,7 +200,7 @@ export default function PomodoroPage() {
                   </div>
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                  Auto-resets stats at midnight • Full date-wise history archives &amp; time waste tracking
+                  Live date-wise statistics &amp; archives • Auto-resets daily at midnight • Continuous timer flow
                 </p>
               </div>
             </div>
@@ -1044,7 +1066,92 @@ export default function PomodoroPage() {
         </div>
       )}
 
-      {/* ── Overview Stats Cards ──────────────────────────────────── */}
+      {/* ── Date-Wise Filter Control Bar ────────────────────────── */}
+      {!zenMode && (
+        <div style={{
+          background: 'var(--bg-card)',
+          borderRadius: 18,
+          border: '1px solid var(--border)',
+          padding: '14px 20px',
+          marginBottom: 24,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Calendar size={18} color="var(--accent)" />
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+              Date-Wise Statistics Filter:
+            </span>
+            <span style={{
+              fontSize: 12,
+              padding: '2px 10px',
+              borderRadius: 20,
+              background: 'rgba(139, 92, 246, 0.15)',
+              color: 'var(--accent)',
+              fontWeight: 700
+            }}>
+              {getFilterLabel()}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {[
+              { key: 'today', label: 'Today' },
+              { key: 'yesterday', label: 'Yesterday' },
+              { key: 'week', label: 'Past 7 Days' },
+              { key: 'all', label: 'All Time' }
+            ].map(f => (
+              <button
+                key={f.key}
+                onClick={() => setHistoryFilter(f.key as HistoryDateFilter)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 10,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  border: '1px solid',
+                  borderColor: historyFilter === f.key ? 'var(--accent)' : 'var(--border)',
+                  background: historyFilter === f.key ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)',
+                  color: historyFilter === f.key ? 'var(--accent)' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+
+            {/* Custom Date Picker Input */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="date"
+                value={customDate}
+                onChange={e => {
+                  setCustomDate(e.target.value);
+                  if (e.target.value) setHistoryFilter('custom');
+                }}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 10,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: historyFilter === 'custom' ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)',
+                  border: historyFilter === 'custom' ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: historyFilter === 'custom' ? 'var(--accent)' : 'var(--text-secondary)',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+                title="Select Custom Date"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Overview Stats Cards (Dynamic Date-Wise Statistics) ─── */}
       {!zenMode && (
         <div style={{
           display: 'grid',
@@ -1075,10 +1182,10 @@ export default function PomodoroPage() {
             </div>
             <div>
               <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>
-                {completedSessionsCount}
+                {selectedPomodoroCount}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Pomodoros Today
+                Pomodoros ({getFilterLabel()})
               </div>
             </div>
           </div>
@@ -1106,12 +1213,12 @@ export default function PomodoroPage() {
             </div>
             <div>
               <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>
-                {totalFocusMinsToday >= 60
-                  ? `${(totalFocusMinsToday / 60).toFixed(1)} hrs`
-                  : `${totalFocusMinsToday} mins`}
+                {selectedFocusMins >= 60
+                  ? `${(selectedFocusMins / 60).toFixed(1)} hrs`
+                  : `${selectedFocusMins} mins`}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Focus Time Today
+                Focus Time ({getFilterLabel()})
               </div>
             </div>
           </div>
@@ -1139,15 +1246,15 @@ export default function PomodoroPage() {
             </div>
             <div>
               <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>
-                {completedSessionsCount} / {settings.longBreakInterval * 2}
+                {selectedPomodoroCount} / {settings.longBreakInterval * 2}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Daily Target Goal
+                Target Goal ({getFilterLabel()})
               </div>
             </div>
           </div>
 
-          {/* Card 4: TIME WASTED TODAY CARD 🚨 */}
+          {/* Card 4: TIME WASTED STATS CARD 🚨 */}
           <div style={{
             background: 'var(--bg-card)',
             border: '1px solid rgba(239, 68, 68, 0.3)',
@@ -1170,10 +1277,10 @@ export default function PomodoroPage() {
             </div>
             <div>
               <div style={{ fontSize: 24, fontWeight: 800, color: '#ef4444' }}>
-                {formatSecsToHoursMins(totalWastedSecondsToday + wastedSeconds)}
+                {formatSecsToHoursMins(selectedWastedSecs)}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Time Wasted Today
+                Time Wasted ({getFilterLabel()})
               </div>
             </div>
           </div>
@@ -1182,213 +1289,163 @@ export default function PomodoroPage() {
 
       {/* ── Sessions & Interruption History Log ────────────────────── */}
       {!zenMode && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Date Filter Bar */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+          {/* Completed Sessions Log */}
           <div style={{
             background: 'var(--bg-card)',
-            borderRadius: 16,
+            borderRadius: 20,
             border: '1px solid var(--border)',
-            padding: '12px 18px',
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12
+            padding: '24px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Calendar size={16} color="var(--accent)" />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
-                Date-Wise History Archives:
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 18
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                Completed Sessions
+              </h3>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {filteredHistory.length} recorded ({getFilterLabel()})
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {[
-                { key: 'today', label: 'Today' },
-                { key: 'yesterday', label: 'Yesterday' },
-                { key: 'week', label: 'Past 7 Days' },
-                { key: 'all', label: 'All Time Archives' }
-              ].map(f => (
-                <button
-                  key={f.key}
-                  onClick={() => setHistoryFilter(f.key as any)}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    border: '1px solid',
-                    borderColor: historyFilter === f.key ? 'var(--accent)' : 'transparent',
-                    background: historyFilter === f.key ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)',
-                    color: historyFilter === f.key ? 'var(--accent)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            {filteredHistory.length === 0 ? (
+              <div style={{
+                padding: '36px 0',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                fontSize: 14
+              }}>
+                No completed sessions found for {getFilterLabel()}.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {filteredHistory.slice(0, 10).map(s => (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: 12,
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <CheckCircle2
+                        size={18}
+                        color={s.mode === 'work' ? '#8b5cf6' : s.mode === 'shortBreak' ? '#06b6d4' : '#f59e0b'}
+                      />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {s.taskTitle ? s.taskTitle : (s.mode === 'work' ? 'Focus Session' : s.mode === 'shortBreak' ? 'Short Break' : 'Long Break')}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {formatItemTimestamp(s.completedAt)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                      background: s.mode === 'work' ? 'rgba(139,92,246,0.15)' : 'rgba(6,186,212,0.15)',
+                      color: s.mode === 'work' ? '#8b5cf6' : '#06b6d4'
+                    }}>
+                      +{s.durationMinutes} mins
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-            {/* Completed Sessions Log */}
+          {/* Time Waste Interruptions Log */}
+          <div style={{
+            background: 'var(--bg-card)',
+            borderRadius: 20,
+            border: '1px solid rgba(239,68,68,0.25)',
+            padding: '24px'
+          }}>
             <div style={{
-              background: 'var(--bg-card)',
-              borderRadius: 20,
-              border: '1px solid var(--border)',
-              padding: '24px'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 18
             }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 18
-              }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
-                  Completed Sessions
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={18} color="#ef4444" />
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#ef4444' }}>
+                  Time Waste Interruptions &amp; Delays
                 </h3>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {filteredHistory.length} recorded
-                </span>
               </div>
-
-              {filteredHistory.length === 0 ? (
-                <div style={{
-                  padding: '36px 0',
-                  textAlign: 'center',
-                  color: 'var(--text-muted)',
-                  fontSize: 14
-                }}>
-                  No completed sessions found for this date view.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {filteredHistory.slice(0, 10).map(s => (
-                    <div
-                      key={s.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px 16px',
-                        borderRadius: 12,
-                        background: 'var(--bg-secondary)',
-                        border: '1px solid var(--border)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <CheckCircle2
-                          size={18}
-                          color={s.mode === 'work' ? '#8b5cf6' : s.mode === 'shortBreak' ? '#06b6d4' : '#f59e0b'}
-                        />
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {s.taskTitle ? s.taskTitle : (s.mode === 'work' ? 'Focus Session' : s.mode === 'shortBreak' ? 'Short Break' : 'Long Break')}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            {formatItemTimestamp(s.completedAt)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        padding: '4px 10px',
-                        borderRadius: 8,
-                        background: s.mode === 'work' ? 'rgba(139,92,246,0.15)' : 'rgba(6,186,212,0.15)',
-                        color: s.mode === 'work' ? '#8b5cf6' : '#06b6d4'
-                      }}>
-                        +{s.durationMinutes} mins
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {filteredWasteHistory.length} logged ({getFilterLabel()})
+              </span>
             </div>
 
-            {/* Time Waste Interruptions Log */}
-            <div style={{
-              background: 'var(--bg-card)',
-              borderRadius: 20,
-              border: '1px solid rgba(239,68,68,0.25)',
-              padding: '24px'
-            }}>
+            {filteredWasteHistory.length === 0 ? (
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 18
+                padding: '36px 0',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                fontSize: 14
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <AlertTriangle size={18} color="#ef4444" />
-                  <h3 style={{ fontSize: 16, fontWeight: 700, color: '#ef4444' }}>
-                    Time Waste Interruptions &amp; Delays
-                  </h3>
-                </div>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {filteredWasteHistory.length} logged
-                </span>
+                🎉 Zero interruptions logged for {getFilterLabel()}!
               </div>
-
-              {filteredWasteHistory.length === 0 ? (
-                <div style={{
-                  padding: '36px 0',
-                  textAlign: 'center',
-                  color: 'var(--text-muted)',
-                  fontSize: 14
-                }}>
-                  🎉 Zero interruptions logged for this date view!
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {filteredWasteHistory.slice(0, 10).map(w => (
-                    <div
-                      key={w.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px 16px',
-                        borderRadius: 12,
-                        background: 'rgba(239,68,68,0.06)',
-                        border: '1px solid rgba(239,68,68,0.2)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <ShieldAlert size={18} color="#ef4444" />
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {w.isOverdueDelay
-                              ? 'Overdue Return After Break'
-                              : w.mode === 'work'
-                              ? (w.taskTitle ? `Interrupted: "${w.taskTitle}"` : 'Interrupted Focus Session')
-                              : w.mode === 'shortBreak'
-                              ? 'Interrupted Short Break'
-                              : 'Interrupted Long Break'}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            {formatItemTimestamp(w.interruptedAt)}
-                          </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {filteredWasteHistory.slice(0, 10).map(w => (
+                  <div
+                    key={w.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: 12,
+                      background: 'rgba(239,68,68,0.06)',
+                      border: '1px solid rgba(239,68,68,0.2)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <ShieldAlert size={18} color="#ef4444" />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {w.isOverdueDelay
+                            ? 'Overdue Return After Break'
+                            : w.mode === 'work'
+                            ? (w.taskTitle ? `Interrupted: "${w.taskTitle}"` : 'Interrupted Focus Session')
+                            : w.mode === 'shortBreak'
+                            ? 'Interrupted Short Break'
+                            : 'Interrupted Long Break'}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {formatItemTimestamp(w.interruptedAt)}
                         </div>
                       </div>
-
-                      <div style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        padding: '4px 10px',
-                        borderRadius: 8,
-                        background: 'rgba(239,68,68,0.15)',
-                        color: '#ef4444'
-                      }}>
-                        -{formatSecsToHoursMins(w.durationSeconds)}
-                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+
+                    <div style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                      background: 'rgba(239,68,68,0.15)',
+                      color: '#ef4444'
+                    }}>
+                      -{formatSecsToHoursMins(w.durationSeconds)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

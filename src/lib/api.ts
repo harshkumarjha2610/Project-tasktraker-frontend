@@ -124,3 +124,78 @@ export async function updateNote(id: string, updates: Partial<Note>): Promise<No
 export async function deleteNote(id: string): Promise<void> {
   await request(`/notes/${id}`, { method: 'DELETE' });
 }
+
+// ─── Pomodoro API ──────────────────────────────────────────────
+export interface PomodoroBackendData {
+  settings: {
+    workDuration: number;
+    shortBreakDuration: number;
+    longBreakDuration: number;
+    longBreakInterval: number;
+    autoStartBreaks: boolean;
+    autoStartPomodoros: boolean;
+    soundEnabled: boolean;
+    tickingEnabled: boolean;
+    bellEnabled: boolean;
+    clockStyle: string;
+  };
+  colorTheme: string;
+  bgStyle: string;
+  history: Array<{
+    id: string;
+    mode: 'work' | 'shortBreak' | 'longBreak';
+    durationMinutes: number;
+    taskTitle?: string;
+    completedAt: string;
+  }>;
+  wasteHistory: Array<{
+    id: string;
+    mode: 'work' | 'shortBreak' | 'longBreak';
+    taskTitle?: string;
+    durationSeconds: number;
+    interruptedAt: string;
+    isOverdueDelay?: boolean;
+  }>;
+}
+
+export async function getPomodoroData(): Promise<PomodoroBackendData> {
+  const res = await request<{ data: PomodoroBackendData }>('/pomodoro');
+  return res.data;
+}
+
+export async function updatePomodoroSettings(payload: {
+  settings?: Record<string, unknown>;
+  colorTheme?: string;
+  bgStyle?: string;
+}): Promise<PomodoroBackendData> {
+  const res = await request<{ data: PomodoroBackendData }>('/pomodoro/settings', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  return res.data;
+}
+
+export async function addPomodoroSession(session: Record<string, unknown>): Promise<PomodoroBackendData> {
+  const res = await request<{ data: PomodoroBackendData }>('/pomodoro/session', {
+    method: 'POST',
+    body: JSON.stringify({ session }),
+  });
+  return res.data;
+}
+
+export async function addWasteSession(wasteRecord: Record<string, unknown>): Promise<PomodoroBackendData> {
+  const res = await request<{ data: PomodoroBackendData }>('/pomodoro/waste', {
+    method: 'POST',
+    body: JSON.stringify({ wasteRecord }),
+  });
+  return res.data;
+}
+
+export async function syncPomodoroData(payload: Partial<PomodoroBackendData>): Promise<PomodoroBackendData> {
+  const res = await request<{ data: PomodoroBackendData }>('/pomodoro/sync', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  return res.data;
+}
+

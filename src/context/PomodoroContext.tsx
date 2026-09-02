@@ -2,6 +2,14 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useTaskContext } from '@/context/TaskContext';
+import {
+  getPomodoroData,
+  updatePomodoroSettings,
+  addPomodoroSession,
+  addWasteSession,
+  syncPomodoroData,
+  type PomodoroBackendData,
+} from '@/lib/api';
 
 export type TimerMode = 'work' | 'shortBreak' | 'longBreak';
 export type AmbientSoundType = 'none' | 'rain' | 'waves' | 'space' | 'cafe' | 'clock';
@@ -424,71 +432,128 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(midnightInterval);
   }, [history, wasteHistory, recalculateDailyStats]);
 
-  // Load saved data from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedSettings = localStorage.getItem('dt_pomodoro_settings');
-      if (savedSettings) {
-        try {
-          const parsed = JSON.parse(savedSettings);
-          setSettings({ ...DEFAULT_SETTINGS, ...parsed });
-          setTimeLeft((parsed.workDuration || 25) * 60);
-        } catch (e) {
-          console.error('Failed to parse pomodoro settings', e);
+  // Sync backend Pomodoro data & migrate local storage if needed
+  const syncBackendData = useCallback(async () => {
+    try {
+      const backendData = await getPomodoroData();
+
+      if (typeof window !== 'undefined') {
+        const savedSettings = localStorage.getItem('dt_pomodoro_settings');
+        const savedHistory = localStorage.getItem('dt_pomodoro_history');
+        const savedWaste = localStorage.getItem('dt_pomodoro_waste_history');
+        const savedColorTheme = localStorage.getItem('dt_pomodoro_color_theme');
+        const savedBgStyle = localStorage.getItem('dt_pomodoro_bg_style');
+
+        let parsedHistory: PomodoroSession[] = [];
+        let parsedWaste: WastedSessionRecord[] = [];
+        let parsedSettings: Partial<TimerSettings> | null = null;
+
+        if (savedHistory) {
+          try { parsedHistory = JSON.parse(savedHistory); } catch (e) {}
+        }
+        if (savedWaste) {
+          try { parsedWaste = JSON.parse(savedWaste); } catch (e) {}
+        }
+        if (savedSettings) {
+          try { parsedSettings = JSON.parse(savedSettings); } catch (e) {}
+        }
+
+        const hasLocalToMigrate = parsedHistory.length > 0 || parsedWaste.length > 0 || !!parsedSettings || !!savedColorTheme || !!savedBgStyle;
+
+        if (hasLocalToMigrate) {
+          const synced = await syncPomodoroData({
+            settings: parsedSettings ? ({ ...DEFAULT_SETTINGS, ...parsedSettings } as unknown as PomodoroBackendData['settings']) : backendData.settings,
+            colorTheme: savedColorTheme || backendData.colorTheme,
+            bgStyle: savedBgStyle || backendData.bgStyle,
+            history: parsedHistory as unknown as PomodoroBackendData['history'],
+            wasteHistory: parsedWaste as unknown as PomodoroBackendData['wasteHistory'],
+          });
+
+          // Clean local storage after successful backend migration
+          localStorage.removeItem('dt_pomodoro_settings');
+          localStorage.removeItem('dt_pomodoro_history');
+          localStorage.removeItem('dt_pomodoro_waste_history');
+          localStorage.removeItem('dt_pomodoro_color_theme');
+          localStorage.removeItem('dt_pomodoro_bg_style');
+
+          if (synced.settings) setSettings({ ...DEFAULT_SETTINGS, ...synced.settings } as TimerSettings);
+          if (synced.colorTheme && THEME_PALETTES[synced.colorTheme as PomodoroThemeColor]) {
+            setColorTheme(synced.colorTheme as PomodoroThemeColor);
+          }
+          if (synced.bgStyle && BG_STYLES[synced.bgStyle as PomodoroBgStyle]) {
+            setBgStyle(synced.bgStyle as PomodoroBgStyle);
+          }
+          if (Array.isArray(synced.history)) setHistory(synced.history as PomodoroSession[]);
+          if (Array.isArray(synced.wasteHistory)) setWasteHistory(synced.wasteHistory as WastedSessionRecord[]);
+          recalculateDailyStats((synced.history || []) as PomodoroSession[], (synced.wasteHistory || []) as WastedSessionRecord[]);
+          return;
         }
       }
 
-      const savedColorTheme = localStorage.getItem('dt_pomodoro_color_theme') as PomodoroThemeColor;
-      if (savedColorTheme && THEME_PALETTES[savedColorTheme]) {
-        setColorTheme(savedColorTheme);
+      // Normal application of backend data
+      if (backendData.settings) {
+        setSettings({ ...DEFAULT_SETTINGS, ...backendData.settings } as TimerSettings);
       }
-
-      const savedBgStyle = localStorage.getItem('dt_pomodoro_bg_style') as PomodoroBgStyle;
-      if (savedBgStyle && BG_STYLES[savedBgStyle]) {
-        setBgStyle(savedBgStyle);
+      if (backendData.colorTheme && THEME_PALETTES[backendData.colorTheme as PomodoroThemeColor]) {
+        setColorTheme(backendData.colorTheme as PomodoroThemeColor);
       }
-
-      let parsedHistory: PomodoroSession[] = [];
-      const savedHistory = localStorage.getItem('dt_pomodoro_history');
-      if (savedHistory) {
-        try {
-          parsedHistory = JSON.parse(savedHistory);
-          setHistory(parsedHistory);
-        } catch (e) {
-          console.error('Failed to parse pomodoro history', e);
-        }
+      if (backendData.bgStyle && BG_STYLES[backendData.bgStyle as PomodoroBgStyle]) {
+        setBgStyle(backendData.bgStyle as PomodoroBgStyle);
       }
-
-      let parsedWaste: WastedSessionRecord[] = [];
-      const savedWasteHistory = localStorage.getItem('dt_pomodoro_waste_history');
-      if (savedWasteHistory) {
-        try {
-          parsedWaste = JSON.parse(savedWasteHistory);
-          setWasteHistory(parsedWaste);
-        } catch (e) {
-          console.error('Failed to parse waste history', e);
-        }
+      if (Array.isArray(backendData.history)) {
+        setHistory(backendData.history as PomodoroSession[]);
       }
-
-      // Initial stats recalculation based on current date
-      recalculateDailyStats(parsedHistory, parsedWaste);
-
-      setQuoteIndex(Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length));
+      if (Array.isArray(backendData.wasteHistory)) {
+        setWasteHistory(backendData.wasteHistory as WastedSessionRecord[]);
+      }
+      recalculateDailyStats((backendData.history || []) as PomodoroSession[], (backendData.wasteHistory || []) as WastedSessionRecord[]);
+    } catch (e) {
+      console.error('[PomodoroContext] Failed to sync data with backend server:', e);
     }
   }, [recalculateDailyStats]);
 
+  // Initial load & continuous cross-device sync interval + visibility listener
+  useEffect(() => {
+    syncBackendData();
+    setQuoteIndex(Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length));
+
+    // Poll every 6 seconds to keep all devices & browsers in sync
+    const pollInterval = setInterval(() => {
+      syncBackendData();
+    }, 6000);
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        syncBackendData();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.addEventListener('focus', handleVisibilityOrFocus);
+    }
+
+    return () => {
+      clearInterval(pollInterval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+        window.removeEventListener('focus', handleVisibilityOrFocus);
+      }
+    };
+  }, [syncBackendData]);
+
   const changeColorTheme = (t: PomodoroThemeColor) => {
     setColorTheme(t);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dt_pomodoro_color_theme', t);
-    }
+    updatePomodoroSettings({ colorTheme: t }).catch(err => {
+      console.error('[PomodoroContext] Failed to sync color theme to backend', err);
+    });
   };
 
   const changeBgStyle = (b: PomodoroBgStyle) => {
     setBgStyle(b);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dt_pomodoro_bg_style', b);
-    }
+    updatePomodoroSettings({ bgStyle: b }).catch(err => {
+      console.error('[PomodoroContext] Failed to sync bg style to backend', err);
+    });
   };
 
   // Commit Wasted Time Session
@@ -519,17 +584,15 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     setWasteHistory(prev => {
       const updated = [newRecord, ...prev];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dt_pomodoro_waste_history', JSON.stringify(updated));
-      }
       return updated;
+    });
+
+    addWasteSession(newRecord as unknown as Record<string, unknown>).catch(err => {
+      console.error('[PomodoroContext] Failed to sync waste session to backend', err);
     });
 
     setTotalWastedSecondsToday(prev => {
       const newTotal = prev + durationSecs;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dt_pomodoro_total_waste_secs', String(newTotal));
-      }
       return newTotal;
     });
 
@@ -632,10 +695,11 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     setHistory(prev => {
       const updated = [newSession, ...prev];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dt_pomodoro_history', JSON.stringify(updated));
-      }
       return updated;
+    });
+
+    addPomodoroSession(newSession as unknown as Record<string, unknown>).catch(err => {
+      console.error('[PomodoroContext] Failed to sync completed pomodoro session to backend', err);
     });
 
     if (mode === 'work') {
@@ -882,12 +946,12 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
   const saveSettings = (newSettings: TimerSettings) => {
     setSettings(newSettings);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('dt_pomodoro_settings', JSON.stringify(newSettings));
-    }
     if (!isRunning) {
       setTimeLeft(getModeDurationSeconds(mode, newSettings));
     }
+    updatePomodoroSettings({ settings: newSettings as unknown as Record<string, unknown> }).catch(err => {
+      console.error('[PomodoroContext] Failed to sync settings to backend', err);
+    });
   };
 
   const formatSecsToMMSS = (sec: number) => {
