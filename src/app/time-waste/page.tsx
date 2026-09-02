@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   History, Play, Square, RotateCcw, AlertTriangle, Clock, 
   Flame, Calendar, Plus, Trash2, Tag, ShieldAlert, Sparkles 
 } from 'lucide-react';
+import { getPomodoroData, updateStandaloneWasteState } from '@/lib/api';
 
 interface WasteSession {
   id: string;
@@ -13,6 +14,15 @@ interface WasteSession {
   durationMs: number;
   reason: string;
 }
+
+const getLocalDateKey = (d: Date | string | number) => {
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return '';
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function TimeWastePage() {
   const [isRunning, setIsRunning] = useState<boolean>(true);
@@ -25,48 +35,106 @@ export default function TimeWastePage() {
 
   const initializedRef = useRef<boolean>(false);
 
-  // Initialize and load timer state from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  // Sync waste data with backend & migrate local storage on initial mount
+  const syncWasteDataFromBackend = useCallback(async () => {
+    try {
+      const data = await getPomodoroData();
+      const remote = data.standaloneWasteState;
 
-    const storedRunning = localStorage.getItem('tw_timer_running');
-    const storedStartedAt = localStorage.getItem('tw_timer_started_at');
-    const storedAccumulated = localStorage.getItem('tw_accumulated_ms');
-    const storedSessions = localStorage.getItem('tw_history_sessions');
+      if (typeof window !== 'undefined') {
+        const storedRunning = localStorage.getItem('tw_timer_running');
+        const storedStartedAt = localStorage.getItem('tw_timer_started_at');
+        const storedAccumulated = localStorage.getItem('tw_accumulated_ms');
+        const storedSessions = localStorage.getItem('tw_history_sessions');
 
-    let currentAccumulated = storedAccumulated ? parseInt(storedAccumulated, 10) : 0;
-    if (isNaN(currentAccumulated)) currentAccumulated = 0;
-    setAccumulatedMs(currentAccumulated);
+        if (storedRunning !== null || storedSessions !== null) {
+          let localAccumulated = storedAccumulated ? parseInt(storedAccumulated, 10) : 0;
+          if (isNaN(localAccumulated)) localAccumulated = 0;
+          let localSessions: WasteSession[] = [];
+          if (storedSessions) {
+            try { localSessions = JSON.parse(storedSessions); } catch (e) {}
+          }
+          const localRunning = storedRunning !== 'false';
+          const localStartedAt = storedStartedAt ? parseInt(storedStartedAt, 10) : (localRunning ? Date.now() : null);
 
-    if (storedSessions) {
-      try {
-        setSessions(JSON.parse(storedSessions));
-      } catch (e) {
-        console.error('Failed to parse sessions history:', e);
+          const mergedSessionsMap = new Map<string, WasteSession>();
+          (remote?.sessions || []).forEach(s => mergedSessionsMap.set(s.id, s as WasteSession));
+          localSessions.forEach(s => mergedSessionsMap.set(s.id, s));
+          const mergedSessions = Array.from(mergedSessionsMap.values());
+
+          const finalAccumulated = Math.max(localAccumulated, remote?.accumulatedMs || 0);
+          const finalRunning = remote?.isRunning !== undefined ? remote.isRunning : localRunning;
+          const finalStartedAt = remote?.startedAt ?? localStartedAt;
+
+          await updateStandaloneWasteState({
+            isRunning: finalRunning,
+            startedAt: finalStartedAt,
+            accumulatedMs: finalAccumulated,
+            sessions: mergedSessions,
+          });
+
+          localStorage.removeItem('tw_timer_running');
+          localStorage.removeItem('tw_timer_started_at');
+          localStorage.removeItem('tw_accumulated_ms');
+          localStorage.removeItem('tw_history_sessions');
+
+          setIsRunning(finalRunning);
+          setStartedAt(finalStartedAt);
+          setAccumulatedMs(finalAccumulated);
+          setSessions(mergedSessions);
+          if (finalRunning && finalStartedAt) {
+            setDisplayMs(finalAccumulated + (Date.now() - finalStartedAt));
+          } else {
+            setDisplayMs(finalAccumulated);
+          }
+          return;
+        }
       }
+
+      if (remote) {
+        setIsRunning(remote.isRunning);
+        setStartedAt(remote.startedAt);
+        setAccumulatedMs(remote.accumulatedMs || 0);
+        if (Array.isArray(remote.sessions)) {
+          setSessions(remote.sessions as WasteSession[]);
+        }
+        if (remote.isRunning && remote.startedAt) {
+          setDisplayMs((remote.accumulatedMs || 0) + (Date.now() - remote.startedAt));
+        } else {
+          setDisplayMs(remote.accumulatedMs || 0);
+        }
+      }
+    } catch (err) {
+      console.error('[TimeWaste] Failed to sync backend waste data:', err);
     }
-
-    // Default behavior: Timer runs automatically unless user previously stopped it
-    if (storedRunning === 'false') {
-      setIsRunning(false);
-      setStartedAt(null);
-      setDisplayMs(currentAccumulated);
-    } else {
-      // Running state
-      setIsRunning(true);
-      let startTime = storedStartedAt ? parseInt(storedStartedAt, 10) : Date.now();
-      if (isNaN(startTime)) startTime = Date.now();
-
-      setStartedAt(startTime);
-      localStorage.setItem('tw_timer_running', 'true');
-      localStorage.setItem('tw_timer_started_at', String(startTime));
-      
-      const initialElapsed = currentAccumulated + (Date.now() - startTime);
-      setDisplayMs(initialElapsed);
-    }
-
-    initializedRef.current = true;
   }, []);
+
+  useEffect(() => {
+    syncWasteDataFromBackend();
+    initializedRef.current = true;
+
+    // Cross-device continuous polling every 6 seconds
+    const pollInterval = setInterval(() => {
+      syncWasteDataFromBackend();
+    }, 6000);
+
+    const handleFocus = () => {
+      syncWasteDataFromBackend();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+      window.addEventListener('visibilitychange', handleFocus);
+    }
+
+    return () => {
+      clearInterval(pollInterval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('visibilitychange', handleFocus);
+      }
+    };
+  }, [syncWasteDataFromBackend]);
 
   // Interval loop for live ticking
   useEffect(() => {
@@ -107,10 +175,12 @@ export default function TimeWastePage() {
     setSessions(updatedSessions);
     setCustomNote('');
 
-    localStorage.setItem('tw_timer_running', 'false');
-    localStorage.removeItem('tw_timer_started_at');
-    localStorage.setItem('tw_accumulated_ms', String(newAccumulated));
-    localStorage.setItem('tw_history_sessions', JSON.stringify(updatedSessions));
+    updateStandaloneWasteState({
+      isRunning: false,
+      startedAt: null,
+      accumulatedMs: newAccumulated,
+      sessions: updatedSessions,
+    }).catch(err => console.error('[TimeWaste] Failed to save stop state:', err));
   };
 
   // Handle Start Timer
@@ -121,9 +191,12 @@ export default function TimeWastePage() {
     setIsRunning(true);
     setStartedAt(now);
 
-    localStorage.setItem('tw_timer_running', 'true');
-    localStorage.setItem('tw_timer_started_at', String(now));
-    localStorage.setItem('tw_accumulated_ms', String(accumulatedMs));
+    updateStandaloneWasteState({
+      isRunning: true,
+      startedAt: now,
+      accumulatedMs,
+      sessions,
+    }).catch(err => console.error('[TimeWaste] Failed to save start state:', err));
   };
 
   // Handle Reset Timer
@@ -132,25 +205,35 @@ export default function TimeWastePage() {
 
     const now = Date.now();
     setAccumulatedMs(0);
+    const newStarted = isRunning ? now : null;
 
     if (isRunning) {
       setStartedAt(now);
       setDisplayMs(0);
-      localStorage.setItem('tw_timer_started_at', String(now));
     } else {
       setStartedAt(null);
       setDisplayMs(0);
-      localStorage.removeItem('tw_timer_started_at');
     }
 
-    localStorage.setItem('tw_accumulated_ms', '0');
+    updateStandaloneWasteState({
+      isRunning,
+      startedAt: newStarted,
+      accumulatedMs: 0,
+      sessions,
+    }).catch(err => console.error('[TimeWaste] Failed to save reset state:', err));
   };
 
   // Delete a session log
   const handleDeleteSession = (id: string) => {
     const updated = sessions.filter(s => s.id !== id);
     setSessions(updated);
-    localStorage.setItem('tw_history_sessions', JSON.stringify(updated));
+
+    updateStandaloneWasteState({
+      isRunning,
+      startedAt,
+      accumulatedMs,
+      sessions: updated,
+    }).catch(err => console.error('[TimeWaste] Failed to save delete session state:', err));
   };
 
   // Format MS into days, hours, mins, secs
@@ -176,16 +259,16 @@ export default function TimeWastePage() {
 
   // Today's total wasted time calculation
   const todayWastedMs = useMemo(() => {
-    const todayStr = new Date().toDateString();
+    const todayStr = getLocalDateKey(new Date());
     let total = 0;
 
     sessions.forEach(s => {
-      if (new Date(s.endTime).toDateString() === todayStr) {
+      if (getLocalDateKey(s.endTime) === todayStr) {
         total += s.durationMs;
       }
     });
 
-    if (isRunning && startedAt && new Date(startedAt).toDateString() === todayStr) {
+    if (isRunning && startedAt && getLocalDateKey(startedAt) === todayStr) {
       total += (Date.now() - startedAt);
     }
 

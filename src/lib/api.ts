@@ -156,6 +156,27 @@ export interface PomodoroBackendData {
     interruptedAt: string;
     isOverdueDelay?: boolean;
   }>;
+  activeTimer?: {
+    isRunning: boolean;
+    mode: 'work' | 'shortBreak' | 'longBreak';
+    targetEndTimestamp: number | null;
+    timeLeft: number;
+    selectedTaskId?: string;
+    updatedAt?: number;
+  };
+  standaloneWasteState?: {
+    isRunning: boolean;
+    startedAt: number | null;
+    accumulatedMs: number;
+    sessions: Array<{
+      id: string;
+      startTime: string;
+      endTime: string;
+      durationMs: number;
+      reason: string;
+    }>;
+    updatedAt?: number;
+  };
 }
 
 export async function getPomodoroData(): Promise<PomodoroBackendData> {
@@ -198,4 +219,21 @@ export async function syncPomodoroData(payload: Partial<PomodoroBackendData>): P
   });
   return res.data;
 }
+
+export async function updateActiveTimerState(activeTimer: Record<string, unknown>): Promise<PomodoroBackendData> {
+  const res = await request<{ data: PomodoroBackendData }>('/pomodoro/active-timer', {
+    method: 'PUT',
+    body: JSON.stringify({ activeTimer }),
+  });
+  return res.data;
+}
+
+export async function updateStandaloneWasteState(standaloneWasteState: Record<string, unknown>): Promise<PomodoroBackendData> {
+  const res = await request<{ data: PomodoroBackendData }>('/pomodoro/standalone-waste', {
+    method: 'PUT',
+    body: JSON.stringify({ standaloneWasteState }),
+  });
+  return res.data;
+}
+
 

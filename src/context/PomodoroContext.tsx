@@ -8,8 +8,18 @@ import {
   addPomodoroSession,
   addWasteSession,
   syncPomodoroData,
+  updateActiveTimerState,
   type PomodoroBackendData,
 } from '@/lib/api';
+
+const getLocalDateKey = (d: Date | string | number) => {
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return '';
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export type TimerMode = 'work' | 'shortBreak' | 'longBreak';
 export type AmbientSoundType = 'none' | 'rain' | 'waves' | 'space' | 'cafe' | 'clock';
@@ -406,17 +416,17 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
   // Automatic Midnight (12:00 AM) Rollover Check & Daily Stats Calculation
   const recalculateDailyStats = useCallback((allHistory: PomodoroSession[], allWaste: WastedSessionRecord[]) => {
-    const todayStr = new Date().toDateString();
+    const todayStr = getLocalDateKey(new Date());
     
     // Count today's completed work pomodoros
     const todayWorkCount = allHistory.filter(s =>
-      s.mode === 'work' && new Date(s.completedAt).toDateString() === todayStr
+      s.mode === 'work' && getLocalDateKey(s.completedAt) === todayStr
     ).length;
     setCompletedSessionsCount(todayWorkCount);
 
     // Sum today's wasted seconds
     const todayWasteTotal = allWaste
-      .filter(w => new Date(w.interruptedAt).toDateString() === todayStr)
+      .filter(w => getLocalDateKey(w.interruptedAt) === todayStr)
       .reduce((acc, w) => acc + w.durationSeconds, 0);
     setTotalWastedSecondsToday(todayWasteTotal);
   }, []);
@@ -894,12 +904,15 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         setIsInterrupted(false);
         setOverdueBreakMode(null);
       }
-      targetEndTimestampRef.current = Date.now() + timeLeft * 1000;
+      const targetEnd = Date.now() + timeLeft * 1000;
+      targetEndTimestampRef.current = targetEnd;
       setIsRunning(true);
+      updateActiveTimerState({ isRunning: true, mode, targetEndTimestamp: targetEnd, timeLeft, selectedTaskId }).catch(() => {});
     } else {
       if (settings.soundEnabled) playAudioChime('pause');
       targetEndTimestampRef.current = null;
       setIsRunning(false);
+      updateActiveTimerState({ isRunning: false, mode, targetEndTimestamp: null, timeLeft, selectedTaskId }).catch(() => {});
 
       if (hasSessionStarted) {
         setIsInterrupted(true);
@@ -917,7 +930,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     targetEndTimestampRef.current = null;
     setHasSessionStarted(false);
     setIsRunning(false);
-    setTimeLeft(getModeDurationSeconds(mode));
+    const resetTime = getModeDurationSeconds(mode);
+    setTimeLeft(resetTime);
+    updateActiveTimerState({ isRunning: false, mode, targetEndTimestamp: null, timeLeft: resetTime, selectedTaskId }).catch(() => {});
   };
 
   const handleSkip = () => {
@@ -930,6 +945,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     targetEndTimestampRef.current = null;
     setHasSessionStarted(false);
     setIsRunning(false);
+    updateActiveTimerState({ isRunning: false, mode, targetEndTimestamp: null, timeLeft: 0, selectedTaskId }).catch(() => {});
     if (mode === 'work') switchMode('shortBreak');
     else switchMode('work');
   };
