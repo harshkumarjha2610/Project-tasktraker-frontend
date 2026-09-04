@@ -405,6 +405,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   // Target timestamp ref to calculate exact countdown regardless of component unmounting
   const targetEndTimestampRef = useRef<number | null>(null);
   const lastLocalActionTimeRef = useRef<number>(0);
+  const interruptedStartedAtRef = useRef<number | null>(null);
 
   // Mode durations in seconds
   const getModeDurationSeconds = useCallback((m: TimerMode, customSettings = settings) => {
@@ -528,6 +529,24 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         }
         if (at.selectedTaskId !== undefined && at.selectedTaskId !== null) {
           setSelectedTaskId(at.selectedTaskId);
+        }
+
+        // Interrupted state sync across devices
+        if (at.isInterrupted) {
+          setIsInterrupted(true);
+          setOverdueBreakMode((at.overdueBreakMode as TimerMode) || null);
+          if (at.interruptedStartedAt) {
+            interruptedStartedAtRef.current = at.interruptedStartedAt;
+            const elapsedWasted = Math.max(0, Math.floor((Date.now() - at.interruptedStartedAt) / 1000));
+            setWastedSeconds(elapsedWasted);
+          } else if (typeof at.wastedSeconds === 'number') {
+            setWastedSeconds(at.wastedSeconds);
+          }
+        } else {
+          setIsInterrupted(false);
+          setWastedSeconds(0);
+          setOverdueBreakMode(null);
+          interruptedStartedAtRef.current = null;
         }
 
         if (at.isRunning && at.targetEndTimestamp) {
@@ -664,7 +683,12 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     let wasteInterval: NodeJS.Timeout | null = null;
     if (isInterrupted) {
       wasteInterval = setInterval(() => {
-        setWastedSeconds(prev => prev + 1);
+        if (interruptedStartedAtRef.current) {
+          const elapsed = Math.max(0, Math.floor((Date.now() - interruptedStartedAtRef.current) / 1000));
+          setWastedSeconds(elapsed);
+        } else {
+          setWastedSeconds(prev => prev + 1);
+        }
       }, 1000);
     } else if (wasteInterval) {
       clearInterval(wasteInterval);
@@ -699,11 +723,33 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       const targetEnd = Date.now() + newSecs * 1000;
       targetEndTimestampRef.current = targetEnd;
       setIsRunning(true);
-      updateActiveTimerState({ isRunning: true, mode: newMode, targetEndTimestamp: targetEnd, timeLeft: newSecs, selectedTaskId }).catch(() => {});
+      interruptedStartedAtRef.current = null;
+      updateActiveTimerState({
+        isRunning: true,
+        mode: newMode,
+        targetEndTimestamp: targetEnd,
+        timeLeft: newSecs,
+        selectedTaskId,
+        isInterrupted: false,
+        wastedSeconds: 0,
+        interruptedStartedAt: null,
+        overdueBreakMode: null,
+      }).catch(() => {});
     } else {
       targetEndTimestampRef.current = null;
       setIsRunning(false);
-      updateActiveTimerState({ isRunning: false, mode: newMode, targetEndTimestamp: null, timeLeft: newSecs, selectedTaskId }).catch(() => {});
+      interruptedStartedAtRef.current = null;
+      updateActiveTimerState({
+        isRunning: false,
+        mode: newMode,
+        targetEndTimestamp: null,
+        timeLeft: newSecs,
+        selectedTaskId,
+        isInterrupted: false,
+        wastedSeconds: 0,
+        interruptedStartedAt: null,
+        overdueBreakMode: null,
+      }).catch(() => {});
     }
     setQuoteIndex(prev => (prev + 1) % MOTIVATIONAL_QUOTES.length);
   }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, getModeDurationSeconds, selectedTaskId]);
@@ -718,7 +764,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
     setHasSessionStarted(false);
 
-    if (settings.bellEnabled) {
+    if (settings.soundEnabled && settings.bellEnabled) {
       const bellType = mode === 'work' ? 'focus_to_break' : 'break_to_focus';
       playTransitionBell(bellType);
     } else if (settings.soundEnabled) {
@@ -763,11 +809,24 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       switchMode('work', settings.autoStartPomodoros);
 
       if (!settings.autoStartPomodoros) {
+        const now = Date.now();
         setIsInterrupted(true);
         setOverdueBreakMode(finishedBreak);
+        interruptedStartedAtRef.current = now;
+        updateActiveTimerState({
+          isRunning: false,
+          mode: 'work',
+          targetEndTimestamp: null,
+          timeLeft: getModeDurationSeconds('work'),
+          selectedTaskId,
+          isInterrupted: true,
+          wastedSeconds: 0,
+          interruptedStartedAt: now,
+          overdueBreakMode: finishedBreak,
+        }).catch(() => {});
       }
     }
-  }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, selectedTaskId, completedSessionsCount, switchMode]);
+  }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, selectedTaskId, completedSessionsCount, switchMode, getModeDurationSeconds]);
 
   // Global Timer Tick Interval
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -790,7 +849,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
           targetEndTimestampRef.current = null;
           handleSessionComplete();
         } else {
-          if (settings.tickingEnabled || ambientSound === 'clock') {
+          if (settings.soundEnabled && (settings.tickingEnabled || ambientSound === 'clock')) {
             playClockTickStyle(settings.clockStyle || 'classic', remainingSecs % 2 === 0, 0.08);
           }
         }
@@ -802,7 +861,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRunning, handleSessionComplete, settings.tickingEnabled, settings.clockStyle, ambientSound]);
+  }, [isRunning, handleSessionComplete, settings.soundEnabled, settings.tickingEnabled, settings.clockStyle, ambientSound]);
 
   // Update Document Title Globally
   useEffect(() => {
@@ -918,13 +977,13 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   }, [ambientVolume, stopAmbientSound]);
 
   useEffect(() => {
-    if (isRunning && ambientSound !== 'none' && ambientSound !== 'clock') {
+    if (isRunning && settings.soundEnabled && ambientSound !== 'none' && ambientSound !== 'clock') {
       startAmbientSound(ambientSound);
     } else {
       stopAmbientSound();
     }
     return () => stopAmbientSound();
-  }, [isRunning, ambientSound, startAmbientSound, stopAmbientSound]);
+  }, [isRunning, settings.soundEnabled, ambientSound, startAmbientSound, stopAmbientSound]);
 
   useEffect(() => {
     if (ambientGainNodeRef.current && audioCtxRef.current) {
@@ -943,20 +1002,45 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         setWastedSeconds(0);
         setIsInterrupted(false);
         setOverdueBreakMode(null);
+        interruptedStartedAtRef.current = null;
       }
       const targetEnd = Date.now() + timeLeft * 1000;
       targetEndTimestampRef.current = targetEnd;
       setIsRunning(true);
-      updateActiveTimerState({ isRunning: true, mode, targetEndTimestamp: targetEnd, timeLeft, selectedTaskId }).catch(() => {});
+      updateActiveTimerState({
+        isRunning: true,
+        mode,
+        targetEndTimestamp: targetEnd,
+        timeLeft,
+        selectedTaskId,
+        isInterrupted: false,
+        wastedSeconds: 0,
+        interruptedStartedAt: null,
+        overdueBreakMode: null,
+      }).catch(() => {});
     } else {
       if (settings.soundEnabled) playAudioChime('pause');
       targetEndTimestampRef.current = null;
       setIsRunning(false);
-      updateActiveTimerState({ isRunning: false, mode, targetEndTimestamp: null, timeLeft, selectedTaskId }).catch(() => {});
 
-      if (hasSessionStarted) {
+      const now = Date.now();
+      const newInterrupted = hasSessionStarted;
+      if (newInterrupted) {
         setIsInterrupted(true);
+        interruptedStartedAtRef.current = now;
       }
+
+      updateActiveTimerState({
+        isRunning: false,
+        mode,
+        targetEndTimestamp: null,
+        timeLeft,
+        selectedTaskId,
+        isInterrupted: newInterrupted,
+        wastedSeconds: 0,
+        interruptedStartedAt: newInterrupted ? now : null,
+        overdueBreakMode: null,
+      }).catch(() => {});
     }
   };
 
@@ -967,13 +1051,24 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       setWastedSeconds(0);
       setIsInterrupted(false);
       setOverdueBreakMode(null);
+      interruptedStartedAtRef.current = null;
     }
     targetEndTimestampRef.current = null;
     setHasSessionStarted(false);
     setIsRunning(false);
     const resetTime = getModeDurationSeconds(mode);
     setTimeLeft(resetTime);
-    updateActiveTimerState({ isRunning: false, mode, targetEndTimestamp: null, timeLeft: resetTime, selectedTaskId }).catch(() => {});
+    updateActiveTimerState({
+      isRunning: false,
+      mode,
+      targetEndTimestamp: null,
+      timeLeft: resetTime,
+      selectedTaskId,
+      isInterrupted: false,
+      wastedSeconds: 0,
+      interruptedStartedAt: null,
+      overdueBreakMode: null,
+    }).catch(() => {});
   };
 
   const handleSkip = () => {
@@ -983,6 +1078,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       setWastedSeconds(0);
       setIsInterrupted(false);
       setOverdueBreakMode(null);
+      interruptedStartedAtRef.current = null;
     }
     targetEndTimestampRef.current = null;
     setHasSessionStarted(false);
@@ -991,7 +1087,17 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     const nextTime = getModeDurationSeconds(nextMode);
     setMode(nextMode);
     setTimeLeft(nextTime);
-    updateActiveTimerState({ isRunning: false, mode: nextMode, targetEndTimestamp: null, timeLeft: nextTime, selectedTaskId }).catch(() => {});
+    updateActiveTimerState({
+      isRunning: false,
+      mode: nextMode,
+      targetEndTimestamp: null,
+      timeLeft: nextTime,
+      selectedTaskId,
+      isInterrupted: false,
+      wastedSeconds: 0,
+      interruptedStartedAt: null,
+      overdueBreakMode: null,
+    }).catch(() => {});
   };
 
   const adjustTime = (deltaMinutes: number) => {

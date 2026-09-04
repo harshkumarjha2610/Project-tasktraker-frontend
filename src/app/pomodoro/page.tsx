@@ -208,6 +208,29 @@ export default function PomodoroPage() {
 
           {/* Controls Bar Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Master Sound Toggle */}
+            <button
+              onClick={() => {
+                const newSound = !settings.soundEnabled;
+                saveSettings({ ...settings, soundEnabled: newSound });
+              }}
+              className="btn btn-secondary"
+              style={{
+                padding: '8px 14px',
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: settings.soundEnabled ? 'rgba(139,92,246,0.15)' : 'rgba(239,68,68,0.12)',
+                borderColor: settings.soundEnabled ? 'rgba(139,92,246,0.4)' : 'rgba(239,68,68,0.3)',
+                color: settings.soundEnabled ? '#8b5cf6' : '#ef4444'
+              }}
+              title={settings.soundEnabled ? 'Mute All Sounds' : 'Unmute All Sounds'}
+            >
+              {settings.soundEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
+              <span style={{ fontSize: 13 }}>{settings.soundEnabled ? 'Sound On' : 'Sound Off'}</span>
+            </button>
+
             {/* Clock Ticking Toggle */}
             <button
               onClick={() => {
@@ -221,14 +244,14 @@ export default function PomodoroPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                background: settings.tickingEnabled ? 'rgba(245,158,11,0.15)' : undefined,
-                borderColor: settings.tickingEnabled ? 'rgba(245,158,11,0.4)' : undefined,
-                color: settings.tickingEnabled ? '#f59e0b' : 'var(--text-secondary)'
+                background: settings.soundEnabled && settings.tickingEnabled ? 'rgba(245,158,11,0.15)' : undefined,
+                borderColor: settings.soundEnabled && settings.tickingEnabled ? 'rgba(245,158,11,0.4)' : undefined,
+                color: settings.soundEnabled && settings.tickingEnabled ? '#f59e0b' : 'var(--text-secondary)'
               }}
               title={settings.tickingEnabled ? 'Disable Clock Ticking' : 'Enable Clock Ticking'}
             >
               <Clock size={17} />
-              <span style={{ fontSize: 13 }}>{settings.tickingEnabled ? 'Tick-Tock On' : 'Tick Off'}</span>
+              <span style={{ fontSize: 13 }}>{settings.soundEnabled && settings.tickingEnabled ? 'Tick-Tock On' : 'Tick Off'}</span>
             </button>
 
             {/* Bell Ring Toggle */}
@@ -244,14 +267,14 @@ export default function PomodoroPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                background: settings.bellEnabled ? 'rgba(6,186,212,0.15)' : undefined,
-                borderColor: settings.bellEnabled ? 'rgba(6,186,212,0.4)' : undefined,
-                color: settings.bellEnabled ? '#06b6d4' : 'var(--text-secondary)'
+                background: settings.soundEnabled && settings.bellEnabled ? 'rgba(6,186,212,0.15)' : undefined,
+                borderColor: settings.soundEnabled && settings.bellEnabled ? 'rgba(6,186,212,0.4)' : undefined,
+                color: settings.soundEnabled && settings.bellEnabled ? '#06b6d4' : 'var(--text-secondary)'
               }}
               title={settings.bellEnabled ? 'Disable Transition Bell' : 'Enable Transition Bell'}
             >
               <BellRing size={17} />
-              <span style={{ fontSize: 13 }}>{settings.bellEnabled ? 'Zen Bell On' : 'Bell Off'}</span>
+              <span style={{ fontSize: 13 }}>{settings.soundEnabled && settings.bellEnabled ? 'Zen Bell On' : 'Bell Off'}</span>
             </button>
 
             <button
@@ -1496,10 +1519,21 @@ export default function PomodoroPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Master Audio Sound Enabled</span>
+                    <input
+                      type="checkbox"
+                      checked={settings.soundEnabled}
+                      onChange={e => saveSettings({ ...settings, soundEnabled: e.target.checked })}
+                      style={{ accentColor: 'var(--accent)', width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', opacity: settings.soundEnabled ? 1 : 0.5 }}>
                     <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Clock Ticking Sound</span>
                     <input
                       type="checkbox"
                       checked={settings.tickingEnabled}
+                      disabled={!settings.soundEnabled}
                       onChange={e => saveSettings({ ...settings, tickingEnabled: e.target.checked })}
                       style={{ accentColor: 'var(--accent)', width: 16, height: 16, cursor: 'pointer' }}
                     />

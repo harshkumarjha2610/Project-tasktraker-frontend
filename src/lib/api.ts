@@ -162,6 +162,10 @@ export interface PomodoroBackendData {
     targetEndTimestamp: number | null;
     timeLeft: number;
     selectedTaskId?: string;
+    isInterrupted?: boolean;
+    wastedSeconds?: number;
+    interruptedStartedAt?: number | null;
+    overdueBreakMode?: 'work' | 'shortBreak' | 'longBreak' | null;
     updatedAt?: number;
   };
   standaloneWasteState?: {
