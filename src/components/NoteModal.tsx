@@ -663,12 +663,13 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           </div>
           
           <style dangerouslySetInnerHTML={{__html: `
-            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor}; cursor: text; white-space: pre-wrap; }
-            .tiptap-editor p { margin: 0; line-height: 32px; min-height: 32px; }
-            .tiptap-editor h1 { margin: 0; font-size: 22px; line-height: 32px; font-weight: 700; }
-            .tiptap-editor h2 { margin: 0; font-size: 18px; line-height: 32px; font-weight: 700; }
-            .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; }
-            .tiptap-editor li { margin: 0; line-height: 32px; }
+            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; cursor: text; white-space: pre-wrap; }
+            .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable] { color: ${textColor}; caret-color: ${textColor} !important; }
+            .tiptap-editor p { margin: 0; line-height: 32px; min-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; }
+            .tiptap-editor h1 { margin: 0; font-size: 22px; line-height: 32px; font-weight: 700; color: ${textColor} !important; caret-color: ${textColor} !important; }
+            .tiptap-editor h2 { margin: 0; font-size: 18px; line-height: 32px; font-weight: 700; color: ${textColor} !important; caret-color: ${textColor} !important; }
+            .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; color: ${textColor} !important; }
+            .tiptap-editor li { margin: 0; line-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; }
             .tiptap-editor mark { background-color: rgba(250, 204, 21, 0.4); color: inherit; padding: 2px 4px; border-radius: 4px; }
             .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 32px; line-height: 32px; pointer-events: none; }
 
