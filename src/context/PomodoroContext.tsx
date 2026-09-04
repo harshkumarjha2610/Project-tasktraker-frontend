@@ -404,6 +404,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
   // Target timestamp ref to calculate exact countdown regardless of component unmounting
   const targetEndTimestampRef = useRef<number | null>(null);
+  const lastLocalActionTimeRef = useRef<number>(0);
 
   // Mode durations in seconds
   const getModeDurationSeconds = useCallback((m: TimerMode, customSettings = settings) => {
@@ -505,10 +506,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         setSettings({ ...DEFAULT_SETTINGS, ...backendData.settings } as TimerSettings);
       }
       if (backendData.colorTheme && THEME_PALETTES[backendData.colorTheme as PomodoroThemeColor]) {
-        setColorTheme(backendData.colorTheme as PomodoroThemeColor);
+        setColorTheme(syncedTheme => syncedTheme || backendData.colorTheme as PomodoroThemeColor);
       }
       if (backendData.bgStyle && BG_STYLES[backendData.bgStyle as PomodoroBgStyle]) {
-        setBgStyle(backendData.bgStyle as PomodoroBgStyle);
+        setBgStyle(syncedBg => syncedBg || backendData.bgStyle as PomodoroBgStyle);
       }
       if (Array.isArray(backendData.history)) {
         setHistory(backendData.history as PomodoroSession[]);
@@ -517,6 +518,40 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         setWasteHistory(backendData.wasteHistory as WastedSessionRecord[]);
       }
       recalculateDailyStats((backendData.history || []) as PomodoroSession[], (backendData.wasteHistory || []) as WastedSessionRecord[]);
+
+      // Real-time active timer synchronization across devices & browsers
+      if (backendData.activeTimer && Date.now() - lastLocalActionTimeRef.current > 2500) {
+        const at = backendData.activeTimer;
+
+        if (at.mode && ['work', 'shortBreak', 'longBreak'].includes(at.mode)) {
+          setMode(at.mode as TimerMode);
+        }
+        if (at.selectedTaskId !== undefined && at.selectedTaskId !== null) {
+          setSelectedTaskId(at.selectedTaskId);
+        }
+
+        if (at.isRunning && at.targetEndTimestamp) {
+          const now = Date.now();
+          const remainingMs = at.targetEndTimestamp - now;
+          const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
+
+          if (remainingSecs > 0) {
+            setTimeLeft(remainingSecs);
+            targetEndTimestampRef.current = at.targetEndTimestamp;
+            setIsRunning(true);
+          } else {
+            setTimeLeft(0);
+            targetEndTimestampRef.current = null;
+            setIsRunning(false);
+          }
+        } else {
+          targetEndTimestampRef.current = null;
+          setIsRunning(false);
+          if (typeof at.timeLeft === 'number' && at.timeLeft >= 0) {
+            setTimeLeft(at.timeLeft);
+          }
+        }
+      }
     } catch (e) {
       console.error('[PomodoroContext] Failed to sync data with backend server:', e);
     }
@@ -527,10 +562,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     syncBackendData();
     setQuoteIndex(Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length));
 
-    // Poll every 6 seconds to keep all devices & browsers in sync
+    // Poll every 2.5 seconds to keep all devices & browsers in real-time sync
     const pollInterval = setInterval(() => {
       syncBackendData();
-    }, 6000);
+    }, 2500);
 
     const handleVisibilityOrFocus = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
@@ -648,6 +683,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
   // Switch mode helper
   const switchMode = useCallback((newMode: TimerMode, autoStart = false) => {
+    lastLocalActionTimeRef.current = Date.now();
     if (isInterrupted && wastedSeconds > 0) {
       saveInterruptedWasteSession(wastedSeconds, mode, activeTask?.title, overdueBreakMode);
       setWastedSeconds(0);
@@ -660,14 +696,17 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     setTimeLeft(newSecs);
 
     if (autoStart) {
-      targetEndTimestampRef.current = Date.now() + newSecs * 1000;
+      const targetEnd = Date.now() + newSecs * 1000;
+      targetEndTimestampRef.current = targetEnd;
       setIsRunning(true);
+      updateActiveTimerState({ isRunning: true, mode: newMode, targetEndTimestamp: targetEnd, timeLeft: newSecs, selectedTaskId }).catch(() => {});
     } else {
       targetEndTimestampRef.current = null;
       setIsRunning(false);
+      updateActiveTimerState({ isRunning: false, mode: newMode, targetEndTimestamp: null, timeLeft: newSecs, selectedTaskId }).catch(() => {});
     }
     setQuoteIndex(prev => (prev + 1) % MOTIVATIONAL_QUOTES.length);
-  }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, getModeDurationSeconds]);
+  }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, getModeDurationSeconds, selectedTaskId]);
 
   // Handle Session Completion
   const handleSessionComplete = useCallback(() => {
@@ -894,6 +933,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   }, [ambientVolume]);
 
   const togglePlay = () => {
+    lastLocalActionTimeRef.current = Date.now();
     if (!isRunning) {
       if (settings.soundEnabled) playAudioChime('start');
       setHasSessionStarted(true);
@@ -921,6 +961,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleReset = () => {
+    lastLocalActionTimeRef.current = Date.now();
     if (isInterrupted && wastedSeconds > 0) {
       saveInterruptedWasteSession(wastedSeconds, mode, activeTask?.title, overdueBreakMode);
       setWastedSeconds(0);
@@ -936,6 +977,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleSkip = () => {
+    lastLocalActionTimeRef.current = Date.now();
     if (isInterrupted && wastedSeconds > 0) {
       saveInterruptedWasteSession(wastedSeconds, mode, activeTask?.title, overdueBreakMode);
       setWastedSeconds(0);
@@ -945,16 +987,23 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     targetEndTimestampRef.current = null;
     setHasSessionStarted(false);
     setIsRunning(false);
-    updateActiveTimerState({ isRunning: false, mode, targetEndTimestamp: null, timeLeft: 0, selectedTaskId }).catch(() => {});
-    if (mode === 'work') switchMode('shortBreak');
-    else switchMode('work');
+    const nextMode: TimerMode = mode === 'work' ? 'shortBreak' : 'work';
+    const nextTime = getModeDurationSeconds(nextMode);
+    setMode(nextMode);
+    setTimeLeft(nextTime);
+    updateActiveTimerState({ isRunning: false, mode: nextMode, targetEndTimestamp: null, timeLeft: nextTime, selectedTaskId }).catch(() => {});
   };
 
   const adjustTime = (deltaMinutes: number) => {
+    lastLocalActionTimeRef.current = Date.now();
     setTimeLeft(prev => {
       const updated = Math.max(60, prev + deltaMinutes * 60);
       if (isRunning) {
-        targetEndTimestampRef.current = Date.now() + updated * 1000;
+        const targetEnd = Date.now() + updated * 1000;
+        targetEndTimestampRef.current = targetEnd;
+        updateActiveTimerState({ isRunning: true, mode, targetEndTimestamp: targetEnd, timeLeft: updated, selectedTaskId }).catch(() => {});
+      } else {
+        updateActiveTimerState({ isRunning: false, mode, targetEndTimestamp: null, timeLeft: updated, selectedTaskId }).catch(() => {});
       }
       return updated;
     });
