@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown } from 'lucide-react';
+import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette } from 'lucide-react';
 import { Note } from '@/types/note';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -36,6 +36,37 @@ const FontSize = Extension.create({
     return {
       setFontSize: fontSize => ({ chain }: any) => chain().setMark('textStyle', { fontSize }).run(),
       unsetFontSize: () => ({ chain }: any) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
+    };
+  },
+});
+
+// Custom extension for font color
+const FontColor = Extension.create({
+  name: 'fontColor',
+  addOptions() {
+    return { types: ['textStyle'] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          color: {
+            default: null,
+            parseHTML: element => element.style.color?.replace(/['"]+/g, ''),
+            renderHTML: attributes => {
+              if (!attributes.color) return {};
+              return { style: `color: ${attributes.color}` };
+            },
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setColor: color => ({ chain }: any) => chain().setMark('textStyle', { color }).run(),
+      unsetColor: () => ({ chain }: any) => chain().setMark('textStyle', { color: null }).removeEmptyTextStyle().run(),
     };
   },
 });
@@ -95,9 +126,21 @@ const HIGHLIGHT_COLORS = [
   { name: 'Orange', color: '#fed7aa' },
 ];
 
+const TEXT_COLORS = [
+  { name: 'Red', color: '#ef4444' },
+  { name: 'Blue', color: '#3b82f6' },
+  { name: 'Green', color: '#10b981' },
+  { name: 'Purple', color: '#8b5cf6' },
+  { name: 'Orange', color: '#f59e0b' },
+  { name: 'Pink', color: '#ec4899' },
+  { name: 'White', color: '#ffffff' },
+  { name: 'Dark', color: '#0f172a' },
+];
+
 // Toolbar Component for TipTap
 const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
   const [activeHighlightColor, setActiveHighlightColor] = useState('#fef08a');
+  const [activeTextColor, setActiveTextColor] = useState('#ef4444');
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -253,6 +296,89 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
         </div>
       </div>
 
+      <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 2px', flexShrink: 0 }} />
+
+      {/* Text Color Change Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, padding: '3px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}15` }}>
+        <button
+          type="button"
+          onClick={() => {
+            const currentColor = editor.getAttributes('textStyle').color;
+            if (currentColor) {
+              editor.chain().focus().unsetColor().run();
+            } else {
+              editor.chain().focus().setColor(activeTextColor).run();
+            }
+          }}
+          style={{
+            ...btnStyle(!!editor.getAttributes('textStyle').color),
+            gap: 5,
+            padding: '3px 8px',
+            height: 26,
+            fontSize: 12,
+            fontWeight: 600
+          }}
+          title="Toggle Text Color"
+        >
+          <Palette size={15} />
+          <span style={{ fontSize: 11 }}>Text Color</span>
+        </button>
+
+        <div style={{ width: 1, height: 16, background: `${color}20`, margin: '0 2px' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          {TEXT_COLORS.map(tc => {
+            const isSelected = editor.getAttributes('textStyle').color === tc.color || activeTextColor === tc.color;
+            return (
+              <button
+                key={tc.color}
+                type="button"
+                onClick={() => {
+                  setActiveTextColor(tc.color);
+                  editor.chain().focus().setColor(tc.color).run();
+                }}
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  backgroundColor: tc.color,
+                  border: isSelected ? '2px solid var(--accent)' : '1px solid rgba(0,0,0,0.3)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  transform: isSelected ? 'scale(1.2)' : 'scale(1)',
+                  boxShadow: isSelected ? `0 0 8px ${tc.color}` : 'none',
+                  flexShrink: 0
+                }}
+                title={`Text Color: ${tc.name}`}
+              />
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().unsetColor().run()}
+            style={{
+              background: 'rgba(239,68,68,0.15)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              color: '#ef4444',
+              borderRadius: 6,
+              padding: '2px 6px',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginLeft: 4,
+              height: 22,
+              display: 'flex',
+              alignItems: 'center',
+              whiteSpace: 'nowrap'
+            }}
+            title="Reset Text Color to default"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
       <div style={{ width: 1, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} style={btnStyle(editor.isActive('heading', { level: 1 }))}><Heading1 size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} style={btnStyle(editor.isActive('heading', { level: 2 }))}><Heading2 size={16} /></button>
@@ -346,7 +472,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
   };
 
   const editor = useEditor({
-    extensions: [StarterKit, Highlight.configure({ multicolor: true }), TextStyle, FontSize, TabIndent],
+    extensions: [StarterKit, Highlight.configure({ multicolor: true }), TextStyle, FontSize, FontColor, TabIndent],
     content: '',
     editorProps: {
       attributes: {
@@ -778,13 +904,13 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           
           <style dangerouslySetInnerHTML={{__html: `
             .note-editor-container, .tiptap-editor, .tiptap-editor *, .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable] { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 4h10M7 20h10M12 4v16' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M7 4h10M7 20h10M12 4v16' stroke='%230f172a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, text !important; }
-            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; white-space: pre-wrap; }
+            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor}; caret-color: ${textColor} !important; white-space: pre-wrap; }
             .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable] { color: ${textColor}; caret-color: ${textColor} !important; }
-            .tiptap-editor p { margin: 0; line-height: 32px; min-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; }
-            .tiptap-editor h1 { margin: 0; font-size: 22px; line-height: 32px; font-weight: 700; color: ${textColor} !important; caret-color: ${textColor} !important; }
-            .tiptap-editor h2 { margin: 0; font-size: 18px; line-height: 32px; font-weight: 700; color: ${textColor} !important; caret-color: ${textColor} !important; }
-            .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; color: ${textColor} !important; }
-            .tiptap-editor li { margin: 0; line-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; }
+            .tiptap-editor p { margin: 0; line-height: 32px; min-height: 32px; caret-color: ${textColor} !important; }
+            .tiptap-editor h1 { margin: 0; font-size: 22px; line-height: 32px; font-weight: 700; caret-color: ${textColor} !important; }
+            .tiptap-editor h2 { margin: 0; font-size: 18px; line-height: 32px; font-weight: 700; caret-color: ${textColor} !important; }
+            .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; }
+            .tiptap-editor li { margin: 0; line-height: 32px; caret-color: ${textColor} !important; }
             .tiptap-editor mark { color: #0f172a !important; padding: 2px 5px; border-radius: 4px; font-weight: 500; }
             .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 32px; line-height: 32px; pointer-events: none; }
 
