@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2 } from 'lucide-react';
+import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown } from 'lucide-react';
 import { Note } from '@/types/note';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -86,9 +86,45 @@ const TEXT_COLOR_MAP: Record<string, string> = {
   yellow: '#ffffff',
 };
 
+const HIGHLIGHT_COLORS = [
+  { name: 'Yellow', color: '#fef08a' },
+  { name: 'Green', color: '#bbf7d0' },
+  { name: 'Blue', color: '#bfdbfe' },
+  { name: 'Pink', color: '#fbcfe8' },
+  { name: 'Purple', color: '#e9d5ff' },
+  { name: 'Orange', color: '#fed7aa' },
+];
+
 // Toolbar Component for TipTap
 const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
+  const [activeHighlightColor, setActiveHighlightColor] = useState('#fef08a');
+  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
   if (!editor) return null;
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowHighlightPicker(false);
+      }
+    };
+    if (showHighlightPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showHighlightPicker]);
+
+  const applyHighlight = (hexColor: string) => {
+    setActiveHighlightColor(hexColor);
+    editor.chain().focus().toggleHighlight({ color: hexColor }).run();
+    setShowHighlightPicker(false);
+  };
+
+  const removeHighlight = () => {
+    editor.chain().focus().unsetHighlight().run();
+    setShowHighlightPicker(false);
+  };
 
   const btnStyle = (isActive: boolean) => ({
     background: isActive ? `${color}20` : 'transparent',
@@ -138,7 +174,121 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
       <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} style={btnStyle(editor.isActive('bold'))}><Bold size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} style={btnStyle(editor.isActive('italic'))}><Italic size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} style={btnStyle(editor.isActive('strike'))}><Strikethrough size={16} /></button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHighlight().run()} style={btnStyle(editor.isActive('highlight'))}><Highlighter size={16} /></button>
+      
+      {/* Multi-Color Highlighter Button & Dropdown Picker */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexShrink: 0 }} ref={pickerRef}>
+        <button
+          type="button"
+          onClick={() => {
+            if (editor.isActive('highlight')) {
+              editor.chain().focus().unsetHighlight().run();
+            } else {
+              editor.chain().focus().toggleHighlight({ color: activeHighlightColor }).run();
+            }
+          }}
+          style={{
+            ...btnStyle(editor.isActive('highlight')),
+            gap: 4,
+            paddingRight: 4
+          }}
+          title="Toggle Highlighter"
+        >
+          <Highlighter size={16} />
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: activeHighlightColor,
+              display: 'inline-block',
+              border: '1px solid rgba(0,0,0,0.2)',
+              boxShadow: `0 0 4px ${activeHighlightColor}`
+            }}
+          />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowHighlightPicker(!showHighlightPicker)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: `${color}99`,
+            cursor: 'pointer',
+            padding: '2px 4px',
+            display: 'flex',
+            alignItems: 'center',
+            height: 32
+          }}
+          title="Choose Highlight Color"
+        >
+          <ChevronDown size={12} />
+        </button>
+
+        {/* Color Palette Popover */}
+        {showHighlightPicker && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              marginTop: 6,
+              zIndex: 100,
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '8px 10px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              backdropFilter: 'blur(12px)'
+            }}
+          >
+            {HIGHLIGHT_COLORS.map(c => (
+              <button
+                key={c.color}
+                type="button"
+                onClick={() => applyHighlight(c.color)}
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: '50%',
+                  backgroundColor: c.color,
+                  border: activeHighlightColor === c.color ? '2px solid var(--accent)' : '1px solid rgba(0,0,0,0.2)',
+                  cursor: 'pointer',
+                  transition: 'transform 0.15s ease',
+                  transform: activeHighlightColor === c.color ? 'scale(1.2)' : 'scale(1)',
+                  flexShrink: 0
+                }}
+                title={c.name}
+              />
+            ))}
+
+            <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
+
+            <button
+              type="button"
+              onClick={removeHighlight}
+              style={{
+                background: 'rgba(239,68,68,0.15)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                color: '#ef4444',
+                borderRadius: 6,
+                padding: '2px 6px',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+              title="Remove Highlight"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+      </div>
+
       <div style={{ width: 1, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} style={btnStyle(editor.isActive('heading', { level: 1 }))}><Heading1 size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} style={btnStyle(editor.isActive('heading', { level: 2 }))}><Heading2 size={16} /></button>
@@ -232,7 +382,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
   };
 
   const editor = useEditor({
-    extensions: [StarterKit, Highlight, TextStyle, FontSize, TabIndent],
+    extensions: [StarterKit, Highlight.configure({ multicolor: true }), TextStyle, FontSize, TabIndent],
     content: '',
     editorProps: {
       attributes: {
@@ -671,7 +821,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
             .tiptap-editor h2 { margin: 0; font-size: 18px; line-height: 32px; font-weight: 700; color: ${textColor} !important; caret-color: ${textColor} !important; }
             .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; color: ${textColor} !important; }
             .tiptap-editor li { margin: 0; line-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; }
-            .tiptap-editor mark { background-color: rgba(250, 204, 21, 0.4); color: inherit; padding: 2px 4px; border-radius: 4px; }
+            .tiptap-editor mark { color: #0f172a !important; padding: 2px 5px; border-radius: 4px; font-weight: 500; }
             .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 32px; line-height: 32px; pointer-events: none; }
 
             @media (max-width: 640px) {
