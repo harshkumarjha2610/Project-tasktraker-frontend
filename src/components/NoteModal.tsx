@@ -117,13 +117,11 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
 
   const applyHighlight = (hexColor: string) => {
     setActiveHighlightColor(hexColor);
-    editor.chain().focus().toggleHighlight({ color: hexColor }).run();
-    setShowHighlightPicker(false);
+    editor.chain().focus().setHighlight({ color: hexColor }).run();
   };
 
   const removeHighlight = () => {
     editor.chain().focus().unsetHighlight().run();
-    setShowHighlightPicker(false);
   };
 
   const btnStyle = (isActive: boolean) => ({
@@ -159,134 +157,100 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
       className="note-toolbar"
       style={{ 
         display: 'flex', 
-        gap: 4, 
+        gap: 6, 
         padding: '6px 16px', 
         backgroundColor: 'rgba(255,255,255,0.03)', 
         overflowX: 'auto', 
         flexShrink: 0,
         WebkitOverflowScrolling: 'touch',
         borderBottom: `1px solid ${color}10`,
+        alignItems: 'center'
       }}
     >
       <button type="button" onClick={handleDecreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 13}} title="Decrease font size">A-</button>
       <button type="button" onClick={handleIncreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 15}} title="Increase font size">A+</button>
-      <div style={{ width: 1, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
+      <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 2px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} style={btnStyle(editor.isActive('bold'))}><Bold size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} style={btnStyle(editor.isActive('italic'))}><Italic size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} style={btnStyle(editor.isActive('strike'))}><Strikethrough size={16} /></button>
       
-      {/* Multi-Color Highlighter Button & Dropdown Picker */}
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexShrink: 0 }} ref={pickerRef}>
+      <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 2px', flexShrink: 0 }} />
+
+      {/* Multi-Color Highlighter Bar with Direct Color Swatches */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, padding: '3px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}15` }}>
         <button
           type="button"
           onClick={() => {
             if (editor.isActive('highlight')) {
               editor.chain().focus().unsetHighlight().run();
             } else {
-              editor.chain().focus().toggleHighlight({ color: activeHighlightColor }).run();
+              editor.chain().focus().setHighlight({ color: activeHighlightColor }).run();
             }
           }}
           style={{
             ...btnStyle(editor.isActive('highlight')),
-            gap: 4,
-            paddingRight: 4
+            gap: 5,
+            padding: '3px 8px',
+            height: 26,
+            fontSize: 12,
+            fontWeight: 600
           }}
-          title="Toggle Highlighter"
+          title="Toggle Active Highlighter"
         >
-          <Highlighter size={16} />
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              backgroundColor: activeHighlightColor,
-              display: 'inline-block',
-              border: '1px solid rgba(0,0,0,0.2)',
-              boxShadow: `0 0 4px ${activeHighlightColor}`
-            }}
-          />
+          <Highlighter size={15} />
         </button>
 
-        <button
-          type="button"
-          onClick={() => setShowHighlightPicker(!showHighlightPicker)}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: `${color}99`,
-            cursor: 'pointer',
-            padding: '2px 4px',
-            display: 'flex',
-            alignItems: 'center',
-            height: 32
-          }}
-          title="Choose Highlight Color"
-        >
-          <ChevronDown size={12} />
-        </button>
+        <div style={{ width: 1, height: 16, background: `${color}20`, margin: '0 2px' }} />
 
-        {/* Color Palette Popover */}
-        {showHighlightPicker && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              marginTop: 6,
-              zIndex: 100,
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-              padding: '8px 10px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              backdropFilter: 'blur(12px)'
-            }}
-          >
-            {HIGHLIGHT_COLORS.map(c => (
+        {/* 6 Direct Color Swatch Dots */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          {HIGHLIGHT_COLORS.map(c => {
+            const isCurrentActiveColor = activeHighlightColor === c.color;
+            return (
               <button
                 key={c.color}
                 type="button"
                 onClick={() => applyHighlight(c.color)}
                 style={{
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   borderRadius: '50%',
                   backgroundColor: c.color,
-                  border: activeHighlightColor === c.color ? '2px solid var(--accent)' : '1px solid rgba(0,0,0,0.2)',
+                  border: isCurrentActiveColor ? '2px solid var(--accent)' : '1px solid rgba(0,0,0,0.3)',
                   cursor: 'pointer',
-                  transition: 'transform 0.15s ease',
-                  transform: activeHighlightColor === c.color ? 'scale(1.2)' : 'scale(1)',
+                  transition: 'all 0.15s ease',
+                  transform: isCurrentActiveColor ? 'scale(1.2)' : 'scale(1)',
+                  boxShadow: isCurrentActiveColor ? `0 0 8px ${c.color}` : 'none',
                   flexShrink: 0
                 }}
-                title={c.name}
+                title={`Highlight text in ${c.name}`}
               />
-            ))}
+            );
+          })}
 
-            <div style={{ width: 1, height: 18, background: 'var(--border)', margin: '0 2px' }} />
-
-            <button
-              type="button"
-              onClick={removeHighlight}
-              style={{
-                background: 'rgba(239,68,68,0.15)',
-                border: '1px solid rgba(239,68,68,0.3)',
-                color: '#ef4444',
-                borderRadius: 6,
-                padding: '2px 6px',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-              title="Remove Highlight"
-            >
-              Clear
-            </button>
-          </div>
-        )}
+          <button
+            type="button"
+            onClick={removeHighlight}
+            style={{
+              background: 'rgba(239,68,68,0.15)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              color: '#ef4444',
+              borderRadius: 6,
+              padding: '2px 6px',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginLeft: 4,
+              height: 22,
+              display: 'flex',
+              alignItems: 'center',
+              whiteSpace: 'nowrap'
+            }}
+            title="Remove Highlight from selected text"
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
       <div style={{ width: 1, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
