@@ -663,7 +663,8 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           </div>
           
           <style dangerouslySetInnerHTML={{__html: `
-            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; cursor: text; white-space: pre-wrap; }
+            .note-editor-container, .tiptap-editor, .tiptap-editor *, .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable] { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 4h10M7 20h10M12 4v16' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M7 4h10M7 20h10M12 4v16' stroke='%230f172a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, text !important; }
+            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; white-space: pre-wrap; }
             .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable] { color: ${textColor}; caret-color: ${textColor} !important; }
             .tiptap-editor p { margin: 0; line-height: 32px; min-height: 32px; color: ${textColor} !important; caret-color: ${textColor} !important; }
             .tiptap-editor h1 { margin: 0; font-size: 22px; line-height: 32px; font-weight: 700; color: ${textColor} !important; caret-color: ${textColor} !important; }
