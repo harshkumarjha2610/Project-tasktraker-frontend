@@ -16,6 +16,8 @@ export interface Task {
   isDeleted?: boolean;
   tags?: string[];
   estimatedMinutes?: number;
+  actualMinutes?: number;
+  pomodorosCompleted?: number;
 }
 
 export interface DetailedStats {

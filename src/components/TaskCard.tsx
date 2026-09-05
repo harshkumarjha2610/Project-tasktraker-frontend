@@ -2,7 +2,8 @@
 
 import { Task, Priority, Status, Category } from '@/types/task';
 import { format } from 'date-fns';
-import { Check, Pencil, Trash2, Clock, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Pencil, Trash2, Clock, Calendar, ChevronDown, ChevronUp, Target } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 
 const PRIORITY_MAP: Record<Priority, { cls: string; label: string }> = {
@@ -208,6 +209,20 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
             </div>
           )}
 
+          {/* Pomodoro Focus Time Badge */}
+          {((task.actualMinutes && task.actualMinutes > 0) || task.estimatedMinutes || (task.pomodorosCompleted && task.pomodorosCompleted > 0)) ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(139, 92, 246, 0.12)', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(139, 92, 246, 0.25)', color: '#8b5cf6', fontSize: 11, fontWeight: 600 }}>
+                ⏱️ {task.actualMinutes || 0}m {task.estimatedMinutes ? `/ ${task.estimatedMinutes}m target` : 'spent'}
+              </span>
+              {task.pomodorosCompleted && task.pomodorosCompleted > 0 ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(239, 68, 68, 0.12)', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(239, 68, 68, 0.25)', color: '#ef4444', fontSize: 11, fontWeight: 600 }}>
+                  🍅 {task.pomodorosCompleted}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* Time Progress Bar */}
           {task.dueDate && !isDone && (
             <div style={{ marginTop: 10, marginBottom: 2 }}>
@@ -233,16 +248,41 @@ export default function TaskCard({ task, onToggle, onEdit, onDelete }: TaskCardP
 
         {/* Actions */}
         {!task.isDeleted ? (
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {!isDone && (
+              <Link
+                href={`/pomodoro?taskId=${task.id}`}
+                style={{
+                  padding: '5px 10px',
+                  background: 'rgba(139, 92, 246, 0.15)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  color: '#8b5cf6',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Start Pomodoro focus session for this task"
+              >
+                🍅 Focus
+              </Link>
+            )}
             <button
               onClick={() => onEdit(task)}
               style={{ padding: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              title="Edit Task"
             >
               <Pencil size={13} />
             </button>
             <button
               onClick={() => onDelete(task.id)}
               style={{ padding: 6, background: 'rgba(239, 68, 68, 0.1)', border: 'none', borderRadius: 6, cursor: 'pointer', color: '#ef4444' }}
+              title="Delete Task"
             >
               <Trash2 size={13} />
             </button>

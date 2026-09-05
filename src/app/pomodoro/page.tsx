@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Play, Pause, RotateCcw, SkipForward, Settings, Volume2, VolumeX,
   CheckCircle2, Flame, Award, Clock, Sparkles, Target, X, Check,
@@ -26,7 +26,7 @@ import {
 type HistoryDateFilter = 'today' | 'yesterday' | 'week' | 'custom' | 'all';
 
 export default function PomodoroPage() {
-  const { filteredTasks, toggleComplete } = useTaskContext();
+  const { filteredTasks, tasks, toggleComplete } = useTaskContext();
   const {
     mode, switchMode,
     timeLeft, isRunning, togglePlay, handleReset, handleSkip, adjustTime,
@@ -47,6 +47,17 @@ export default function PomodoroPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<HistoryDateFilter>('today');
   const [customDate, setCustomDate] = useState<string>('');
+
+  // Auto-select task if passed via URL parameter e.g. /pomodoro?taskId=123
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlTaskId = params.get('taskId');
+      if (urlTaskId) {
+        setSelectedTaskId(urlTaskId);
+      }
+    }
+  }, [setSelectedTaskId]);
 
   // Date Filter Logic
   const filterByDate = <T extends { completedAt?: string; interruptedAt?: string }>(items: T[]) => {
@@ -94,7 +105,7 @@ export default function PomodoroPage() {
     }
   };
 
-  const activeTask = filteredTasks.find(t => t.id === selectedTaskId);
+  const activeTask = tasks.find(t => t.id === selectedTaskId) || filteredTasks.find(t => t.id === selectedTaskId);
 
   // Progress & Theme Computations
   const totalSeconds = getModeDurationSeconds(mode);
@@ -994,60 +1005,113 @@ export default function PomodoroPage() {
             background: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
             display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            flexDirection: 'column',
             gap: 12
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 240 }}>
-              <Target size={18} color="var(--accent)" />
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                Active Task:
-              </span>
-              <select
-                value={selectedTaskId}
-                onChange={e => setSelectedTaskId(e.target.value)}
-                style={{
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                  padding: '8px 12px',
-                  fontSize: 13,
-                  outline: 'none',
-                  flex: 1,
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="">-- Select a task to focus on --</option>
-                {filteredTasks.filter(t => t.status !== 'done').map(t => (
-                  <option key={t.id} value={t.id}>
-                    [{t.priority.toUpperCase()}] {t.title}
-                  </option>
-                ))}
-              </select>
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 240 }}>
+                <Target size={18} color="var(--accent)" />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                  Active Task:
+                </span>
+                <select
+                  value={selectedTaskId}
+                  onChange={e => setSelectedTaskId(e.target.value)}
+                  style={{
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    fontSize: 13,
+                    outline: 'none',
+                    flex: 1,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">-- Select a task to focus on --</option>
+                  {(tasks.length > 0 ? tasks : filteredTasks)
+                    .filter(t => !t.isDeleted && t.status !== 'done')
+                    .map(t => {
+                      const actual = t.actualMinutes || 0;
+                      const est = t.estimatedMinutes;
+                      const timeStr = est ? `${actual}/${est}m` : `${actual}m`;
+                      return (
+                        <option key={t.id} value={t.id}>
+                          [{t.priority.toUpperCase()}] {t.title} ({timeStr} • {t.pomodorosCompleted || 0} 🍅)
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+
+              {activeTask && (
+                <button
+                  onClick={() => {
+                    toggleComplete(activeTask.id);
+                  }}
+                  className="btn btn-sm"
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10b981',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    padding: '7px 14px',
+                    borderRadius: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}
+                >
+                  <Check size={14} />
+                  <span>Mark Completed</span>
+                </button>
+              )}
             </div>
 
+            {/* Detailed task tracking stats bar */}
             {activeTask && (
-              <button
-                onClick={() => {
-                  toggleComplete(activeTask.id);
-                }}
-                className="btn btn-sm"
-                style={{
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  color: '#10b981',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  padding: '7px 14px',
-                  borderRadius: 10,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-              >
-                <Check size={14} />
-                <span>Mark Completed</span>
-              </button>
+              <div style={{
+                paddingTop: 10,
+                borderTop: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    ⏱️ Focus Time: <strong style={{ color: 'var(--accent)', fontWeight: 700 }}>{activeTask.actualMinutes || 0} mins</strong>
+                    {activeTask.estimatedMinutes ? ` / ${activeTask.estimatedMinutes} mins target` : ''}
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    🍅 Pomodoros: <strong style={{ color: '#ef4444', fontWeight: 700 }}>{activeTask.pomodorosCompleted || 0}</strong>
+                  </span>
+                </div>
+
+                {activeTask.estimatedMinutes && (
+                  <div style={{ flex: 1, minWidth: 160, maxWidth: 280, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${Math.min(100, Math.round(((activeTask.actualMinutes || 0) / activeTask.estimatedMinutes) * 100))}%`,
+                        background: 'var(--accent)',
+                        borderRadius: 3,
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+                      {Math.min(100, Math.round(((activeTask.actualMinutes || 0) / activeTask.estimatedMinutes) * 100))}%
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

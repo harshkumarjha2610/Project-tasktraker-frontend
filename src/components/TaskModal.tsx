@@ -50,6 +50,7 @@ export default function TaskModal({ task, onSave, onClose }: TaskModalProps) {
   };
 
   const [dueDate, setDueDate] = useState(getInitialDateTime());
+  const [estimatedMinutes, setEstimatedMinutes] = useState<string>(task?.estimatedMinutes ? String(task.estimatedMinutes) : '');
 
   const handleTitleChange = (val: string) => {
     setTitle(capitalizeFirst(val));
@@ -59,12 +60,14 @@ export default function TaskModal({ task, onSave, onClose }: TaskModalProps) {
     e.preventDefault();
     const finalTitle = capitalizeFirst(title.trim());
     if (!finalTitle) return;
+    const estMins = estimatedMinutes ? parseInt(estimatedMinutes, 10) : undefined;
     onSave({
       title: finalTitle,
       priority,
       category,
       status: task?.status ?? 'todo',
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+      estimatedMinutes: estMins && !isNaN(estMins) && estMins > 0 ? estMins : undefined,
     });
   };
 
@@ -157,6 +160,20 @@ export default function TaskModal({ task, onSave, onClose }: TaskModalProps) {
               value={dueDate}
               onChange={e => setDueDate(e.target.value)}
               style={{ colorScheme: 'dark' }}
+            />
+          </div>
+
+          {/* Estimated Focus Time */}
+          <div>
+            <label style={labelStyle}>⏱️ Estimated Focus Time (minutes) <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+            <input
+              type="number"
+              min="1"
+              max="1440"
+              className="input"
+              placeholder="e.g. 60 (for 1 hour)"
+              value={estimatedMinutes}
+              onChange={e => setEstimatedMinutes(e.target.value)}
             />
           </div>
 

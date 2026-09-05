@@ -373,7 +373,7 @@ interface PomodoroContextType {
 const PomodoroContext = createContext<PomodoroContextType | undefined>(undefined);
 
 export function PomodoroProvider({ children }: { children: React.ReactNode }) {
-  const { filteredTasks } = useTaskContext();
+  const { filteredTasks, tasks, editTask } = useTaskContext();
 
   const [settings, setSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
   const [colorTheme, setColorTheme] = useState<PomodoroThemeColor>('purple');
@@ -779,11 +779,12 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       new Notification(title, { body, icon: '/favicon.ico' });
     }
 
-    const linkedTask = filteredTasks.find(t => t.id === selectedTaskId);
+    const linkedTask = tasks.find(t => t.id === selectedTaskId) || filteredTasks.find(t => t.id === selectedTaskId);
+    const sessionDuration = mode === 'work' ? settings.workDuration : mode === 'shortBreak' ? settings.shortBreakDuration : settings.longBreakDuration;
     const newSession: PomodoroSession = {
       id: Math.random().toString(36).substring(2, 9),
       mode,
-      durationMinutes: mode === 'work' ? settings.workDuration : mode === 'shortBreak' ? settings.shortBreakDuration : settings.longBreakDuration,
+      durationMinutes: sessionDuration,
       taskTitle: linkedTask ? linkedTask.title : undefined,
       completedAt: new Date().toISOString(),
     };
@@ -798,6 +799,18 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (mode === 'work') {
+      if (linkedTask && editTask) {
+        const addedMins = settings.workDuration;
+        const newActual = (linkedTask.actualMinutes || 0) + addedMins;
+        const newPoms = (linkedTask.pomodorosCompleted || 0) + 1;
+        editTask(linkedTask.id, {
+          actualMinutes: newActual,
+          pomodorosCompleted: newPoms,
+        }).catch(err => {
+          console.error('[PomodoroContext] Failed to update task focus time:', err);
+        });
+      }
+
       const newCount = completedSessionsCount + 1;
       setCompletedSessionsCount(newCount);
 
@@ -826,7 +839,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         }).catch(() => {});
       }
     }
-  }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, selectedTaskId, completedSessionsCount, switchMode, getModeDurationSeconds]);
+  }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, tasks, editTask, selectedTaskId, completedSessionsCount, switchMode, getModeDurationSeconds]);
 
   // Global Timer Tick Interval
   const timerRef = useRef<NodeJS.Timeout | null>(null);
