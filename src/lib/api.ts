@@ -240,4 +240,167 @@ export async function updateStandaloneWasteState(standaloneWasteState: Record<st
   return res.data;
 }
 
+// ─── English Practice API ──────────────────────────────────────
+import { EnglishPracticeLog } from '@/types/englishPractice';
+import { ClientApproachRecord } from '@/types/clientApproach';
+
+function normalizeEnglishLog(raw: Record<string, unknown>): EnglishPracticeLog {
+  return {
+    id: String(raw._id ?? raw.id),
+    date: (raw.date as string) ?? new Date().toISOString(),
+    practiceType: raw.practiceType as EnglishPracticeLog['practiceType'],
+    durationMinutes: Number(raw.durationMinutes || 0),
+    topic: raw.topic as string,
+    notes: raw.notes as string | undefined,
+    rating: Number(raw.rating || 5),
+    vocabulary: (raw.vocabulary as EnglishPracticeLog['vocabulary']) || [],
+    createdAt: raw.createdAt as string | undefined,
+  };
+}
+
+export async function getEnglishPracticeLogs(): Promise<EnglishPracticeLog[]> {
+  try {
+    const res = await request<{ data: Record<string, unknown>[] }>('/english-practice');
+    return res.data.map(normalizeEnglishLog);
+  } catch (err) {
+    console.warn('[API] English Practice backend offline, loading from localStorage fallback');
+    const local = localStorage.getItem('dt_english_practice_logs');
+    return local ? JSON.parse(local) : [];
+  }
+}
+
+export async function createEnglishPracticeLog(payload: Omit<EnglishPracticeLog, 'id'>): Promise<EnglishPracticeLog> {
+  try {
+    const res = await request<{ data: Record<string, unknown> }>('/english-practice', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return normalizeEnglishLog(res.data);
+  } catch (err) {
+    console.warn('[API] English Practice backend error, saving to localStorage');
+    const local = localStorage.getItem('dt_english_practice_logs');
+    const logs: EnglishPracticeLog[] = local ? JSON.parse(local) : [];
+    const newLog: EnglishPracticeLog = { ...payload, id: 'loc_' + Date.now() };
+    logs.unshift(newLog);
+    localStorage.setItem('dt_english_practice_logs', JSON.stringify(logs));
+    return newLog;
+  }
+}
+
+export async function updateEnglishPracticeLog(id: string, updates: Partial<EnglishPracticeLog>): Promise<EnglishPracticeLog> {
+  try {
+    const res = await request<{ data: Record<string, unknown> }>(`/english-practice/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    return normalizeEnglishLog(res.data);
+  } catch (err) {
+    const local = localStorage.getItem('dt_english_practice_logs');
+    let logs: EnglishPracticeLog[] = local ? JSON.parse(local) : [];
+    let updated: EnglishPracticeLog | null = null;
+    logs = logs.map(item => {
+      if (item.id === id) {
+        updated = { ...item, ...updates };
+        return updated;
+      }
+      return item;
+    });
+    localStorage.setItem('dt_english_practice_logs', JSON.stringify(logs));
+    return updated || ({ ...updates, id } as EnglishPracticeLog);
+  }
+}
+
+export async function deleteEnglishPracticeLog(id: string): Promise<void> {
+  try {
+    await request(`/english-practice/${id}`, { method: 'DELETE' });
+  } catch (err) {
+    const local = localStorage.getItem('dt_english_practice_logs');
+    if (local) {
+      const logs: EnglishPracticeLog[] = JSON.parse(local);
+      localStorage.setItem('dt_english_practice_logs', JSON.stringify(logs.filter(l => l.id !== id)));
+    }
+  }
+}
+
+// ─── Client Approach API ───────────────────────────────────────
+function normalizeClientApproach(raw: Record<string, unknown>): ClientApproachRecord {
+  return {
+    id: String(raw._id ?? raw.id),
+    date: (raw.date as string) ?? new Date().toISOString(),
+    clientName: raw.clientName as string,
+    platform: raw.platform as ClientApproachRecord['platform'],
+    approachType: raw.approachType as ClientApproachRecord['approachType'],
+    status: raw.status as ClientApproachRecord['status'],
+    dealValue: Number(raw.dealValue || 0),
+    notes: raw.notes as string | undefined,
+    followUpDate: raw.followUpDate as string | undefined,
+    createdAt: raw.createdAt as string | undefined,
+  };
+}
+
+export async function getClientApproaches(): Promise<ClientApproachRecord[]> {
+  try {
+    const res = await request<{ data: Record<string, unknown>[] }>('/client-approaches');
+    return res.data.map(normalizeClientApproach);
+  } catch (err) {
+    console.warn('[API] Client Approaches backend offline, loading from localStorage fallback');
+    const local = localStorage.getItem('dt_client_approaches');
+    return local ? JSON.parse(local) : [];
+  }
+}
+
+export async function createClientApproach(payload: Omit<ClientApproachRecord, 'id'>): Promise<ClientApproachRecord> {
+  try {
+    const res = await request<{ data: Record<string, unknown> }>('/client-approaches', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return normalizeClientApproach(res.data);
+  } catch (err) {
+    console.warn('[API] Client Approach backend error, saving to localStorage');
+    const local = localStorage.getItem('dt_client_approaches');
+    const items: ClientApproachRecord[] = local ? JSON.parse(local) : [];
+    const newItem: ClientApproachRecord = { ...payload, id: 'loc_' + Date.now() };
+    items.unshift(newItem);
+    localStorage.setItem('dt_client_approaches', JSON.stringify(items));
+    return newItem;
+  }
+}
+
+export async function updateClientApproach(id: string, updates: Partial<ClientApproachRecord>): Promise<ClientApproachRecord> {
+  try {
+    const res = await request<{ data: Record<string, unknown> }>(`/client-approaches/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    return normalizeClientApproach(res.data);
+  } catch (err) {
+    const local = localStorage.getItem('dt_client_approaches');
+    let items: ClientApproachRecord[] = local ? JSON.parse(local) : [];
+    let updated: ClientApproachRecord | null = null;
+    items = items.map(item => {
+      if (item.id === id) {
+        updated = { ...item, ...updates };
+        return updated;
+      }
+      return item;
+    });
+    localStorage.setItem('dt_client_approaches', JSON.stringify(items));
+    return updated || ({ ...updates, id } as ClientApproachRecord);
+  }
+}
+
+export async function deleteClientApproach(id: string): Promise<void> {
+  try {
+    await request(`/client-approaches/${id}`, { method: 'DELETE' });
+  } catch (err) {
+    const local = localStorage.getItem('dt_client_approaches');
+    if (local) {
+      const items: ClientApproachRecord[] = JSON.parse(local);
+      localStorage.setItem('dt_client_approaches', JSON.stringify(items.filter(i => i.id !== id)));
+    }
+  }
+}
+
+
 

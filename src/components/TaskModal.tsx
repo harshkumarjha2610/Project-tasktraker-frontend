@@ -19,6 +19,7 @@ const PRIORITIES: { value: Priority; label: string; color: string }[] = [
 
 const CATEGORIES: { value: Category; label: string; emoji: string }[] = [
   { value: 'work', label: 'Work', emoji: '💼' },
+  { value: 'company project', label: 'Company Project', emoji: '🏢' },
   { value: 'personal', label: 'Personal', emoji: '👤' },
   { value: 'health', label: 'Health', emoji: '❤️' },
   { value: 'learning', label: 'Learning', emoji: '📚' },

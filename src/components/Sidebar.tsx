@@ -4,19 +4,22 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CheckSquare, BarChart3, Tag, Settings,
-  Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen, Gamepad2, StickyNote, Hourglass, Timer
+  Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen, Gamepad2, StickyNote, Hourglass, Timer,
+  Languages, UserPlus
 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 
 const NAV_ITEMS = [
-  { href: '/',           icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/tasks',      icon: CheckSquare,     label: 'Tasks' },
-  { href: '/notes',      icon: StickyNote,      label: 'Notes' },
-  { href: '/pomodoro',   icon: Timer,           label: 'Pomodoro Timer' },
-  { href: '/analytics',  icon: BarChart3,       label: 'Analytics' },
-  { href: '/time-waste', icon: Hourglass,       label: 'Time Waste' },
-  { href: '/categories', icon: Tag,             label: 'Categories' },
-  { href: '/settings',   icon: Settings,        label: 'Settings' },
+  { href: '/',                  icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/tasks',             icon: CheckSquare,     label: 'Tasks' },
+  { href: '/english-practice',  icon: Languages,        label: 'English Practice' },
+  { href: '/client-approaches', icon: UserPlus,         label: 'Client Approaches' },
+  { href: '/notes',             icon: StickyNote,      label: 'Notes' },
+  { href: '/pomodoro',          icon: Timer,           label: 'Pomodoro Timer' },
+  { href: '/analytics',         icon: BarChart3,       label: 'Analytics' },
+  { href: '/time-waste',        icon: Hourglass,       label: 'Time Waste' },
+  { href: '/categories',        icon: Tag,             label: 'Categories' },
+  { href: '/settings',          icon: Settings,        label: 'Settings' },
 ];
 
 interface SidebarProps {

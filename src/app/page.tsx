@@ -19,6 +19,7 @@ import { format, isToday, isTomorrow, isPast } from 'date-fns';
 
 const CATEGORY_COLORS: Record<Category, string> = {
   work: '#8b5cf6',
+  'company project': '#ec4899',
   personal: '#06b6d4',
   health: '#10b981',
   learning: '#f59e0b',
@@ -70,7 +71,7 @@ export default function DashboardPage() {
     const totalEstMins = tasks.reduce((acc, t) => acc + (t.estimatedMinutes || 0), 0);
     const totalActualMins = tasks.reduce((acc, t) => acc + (t.actualMinutes || 0), 0);
 
-    const byCategory: Record<Category, number> = { work: 0, personal: 0, health: 0, learning: 0, other: 0 };
+    const byCategory: Record<Category, number> = { work: 0, 'company project': 0, personal: 0, health: 0, learning: 0, other: 0 };
     const byPriority: Record<Priority, number> = { 'super high': 0, high: 0, medium: 0, low: 0 };
 
     tasks.forEach(t => {
@@ -449,7 +450,7 @@ export default function DashboardPage() {
               Category Distribution
             </span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(['work', 'personal', 'health', 'learning', 'other'] as Category[]).map(cat => {
+              {(['work', 'company project', 'personal', 'health', 'learning', 'other'] as Category[]).map(cat => {
                 const count = taskStats.byCategory[cat] || 0;
                 const pct = taskStats.total > 0 ? Math.round((count / taskStats.total) * 100) : 0;
                 const catColor = CATEGORY_COLORS[cat];

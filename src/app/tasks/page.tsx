@@ -205,6 +205,7 @@ export default function TasksPage() {
             <select className="input select" value={filterCategory} onChange={e => setFilterCategory(e.target.value as any)}>
               <option value="all">All Categories</option>
               <option value="work">Work</option>
+              <option value="company project">Company Project</option>
               <option value="personal">Personal</option>
               <option value="health">Health</option>
               <option value="learning">Learning</option>

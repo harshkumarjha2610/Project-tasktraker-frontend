@@ -20,7 +20,7 @@ const STATUS_MAP: Record<Status, { cls: string; label: string }> = {
 };
 
 const CATEGORY_COLORS: Record<Category, string> = {
-  work: '#8b5cf6', personal: '#06b6d4', health: '#10b981', learning: '#f59e0b', other: '#6b7280',
+  work: '#8b5cf6', 'company project': '#ec4899', personal: '#06b6d4', health: '#10b981', learning: '#f59e0b', other: '#6b7280',
 };
 
 interface TaskCardProps {

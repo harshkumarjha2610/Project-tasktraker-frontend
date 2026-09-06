@@ -8,7 +8,7 @@ import { Priority } from '@/types/task';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444'];
 const CATEGORY_COLORS: Record<string, string> = {
-  work: '#8b5cf6', personal: '#06b6d4', health: '#10b981', learning: '#f59e0b', other: '#6b7280',
+  work: '#8b5cf6', 'company project': '#ec4899', personal: '#06b6d4', health: '#10b981', learning: '#f59e0b', other: '#6b7280',
 };
 
 const customTooltipStyle = {

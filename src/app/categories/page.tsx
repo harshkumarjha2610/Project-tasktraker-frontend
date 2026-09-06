@@ -2,15 +2,16 @@
 
 import { useTaskContext } from '@/context/TaskContext';
 import { useMemo } from 'react';
-import { Briefcase, User, Heart, BookOpen, MoreHorizontal } from 'lucide-react';
+import { Briefcase, Building2, User, Heart, BookOpen, MoreHorizontal } from 'lucide-react';
 import type { Category } from '@/types/task';
 
 const CATEGORY_INFO: Record<Category, { label: string; icon: React.ReactNode; color: string; desc: string }> = {
-  work:     { label: 'Work',     icon: <Briefcase size={20} />, color: '#8b5cf6', desc: 'Professional tasks, meetings, and projects' },
-  personal: { label: 'Personal', icon: <User size={20} />,      color: '#06b6d4', desc: 'Personal errands and life admin' },
-  health:   { label: 'Health',   icon: <Heart size={20} />,     color: '#10b981', desc: 'Fitness, wellness, and self-care' },
-  learning: { label: 'Learning', icon: <BookOpen size={20} />,  color: '#f59e0b', desc: 'Study, courses, and skill building' },
-  other:    { label: 'Other',    icon: <MoreHorizontal size={20} />, color: '#6b7280', desc: 'Miscellaneous tasks' },
+  work:              { label: 'Work',            icon: <Briefcase size={20} />,      color: '#8b5cf6', desc: 'Professional tasks, meetings, and projects' },
+  'company project': { label: 'Company Project', icon: <Building2 size={20} />,      color: '#ec4899', desc: 'Company deliverables, corporate tasks, and key milestones' },
+  personal:          { label: 'Personal',        icon: <User size={20} />,           color: '#06b6d4', desc: 'Personal errands and life admin' },
+  health:            { label: 'Health',          icon: <Heart size={20} />,          color: '#10b981', desc: 'Fitness, wellness, and self-care' },
+  learning:          { label: 'Learning',        icon: <BookOpen size={20} />,       color: '#f59e0b', desc: 'Study, courses, and skill building' },
+  other:             { label: 'Other',           icon: <MoreHorizontal size={20} />, color: '#6b7280', desc: 'Miscellaneous tasks' },
 };
 
 export default function CategoriesPage() {

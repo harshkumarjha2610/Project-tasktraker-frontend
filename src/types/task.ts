@@ -1,7 +1,7 @@
 // Types for the daily task manager
 export type Priority = 'super high' | 'high' | 'medium' | 'low';
 export type Status = 'todo' | 'inprogress' | 'done';
-export type Category = 'work' | 'personal' | 'health' | 'learning' | 'other';
+export type Category = 'work' | 'company project' | 'personal' | 'health' | 'learning' | 'other';
 
 export interface Task {
   id: string;
