@@ -241,7 +241,7 @@ export default function NotesPage() {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: 16,
-            alignItems: 'start',
+            alignItems: 'stretch',
           }}
         >
           {filteredNotes.map((note) => (
