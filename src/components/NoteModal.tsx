@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette, Image as ImageIcon } from 'lucide-react';
+import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette, Image as ImageIcon, Type } from 'lucide-react';
 import { Note } from '@/types/note';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -73,6 +73,37 @@ const FontColor = Extension.create({
   },
 });
 
+// Custom extension for font family
+const FontFamily = Extension.create({
+  name: 'fontFamily',
+  addOptions() {
+    return { types: ['textStyle'] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontFamily: {
+            default: null,
+            parseHTML: element => element.style.fontFamily?.replace(/['"]+/g, ''),
+            renderHTML: attributes => {
+              if (!attributes.fontFamily) return {};
+              return { style: `font-family: ${attributes.fontFamily}` };
+            },
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setFontFamily: fontFamily => ({ chain }: any) => chain().setMark('textStyle', { fontFamily }).run(),
+      unsetFontFamily: () => ({ chain }: any) => chain().setMark('textStyle', { fontFamily: null }).removeEmptyTextStyle().run(),
+    };
+  },
+});
+
 // Custom extension to allow inserting tabs/spaces with the Tab key
 const TabIndent = Extension.create({
   name: 'tabIndent',
@@ -122,21 +153,32 @@ const TEXT_COLOR_MAP: Record<string, string> = {
 const HIGHLIGHT_COLORS = [
   { name: 'Yellow', color: '#fef08a' },
   { name: 'Green', color: '#bbf7d0' },
+  { name: 'Mint', color: '#a7f3d0' },
   { name: 'Blue', color: '#bfdbfe' },
+  { name: 'Cyan', color: '#cffafe' },
   { name: 'Pink', color: '#fbcfe8' },
   { name: 'Purple', color: '#e9d5ff' },
   { name: 'Orange', color: '#fed7aa' },
+  { name: 'Rose', color: '#fecdd3' },
 ];
 
 const TEXT_COLORS = [
   { name: 'Red', color: '#ef4444' },
-  { name: 'Blue', color: '#3b82f6' },
-  { name: 'Green', color: '#10b981' },
-  { name: 'Purple', color: '#8b5cf6' },
+  { name: 'Rose', color: '#f43f5e' },
   { name: 'Orange', color: '#f59e0b' },
+  { name: 'Amber', color: '#d97706' },
+  { name: 'Yellow', color: '#eab308' },
+  { name: 'Green', color: '#10b981' },
+  { name: 'Teal', color: '#06b6d4' },
+  { name: 'Sky Blue', color: '#0284c7' },
+  { name: 'Royal Blue', color: '#3b82f6' },
+  { name: 'Indigo', color: '#6366f1' },
+  { name: 'Purple', color: '#8b5cf6' },
+  { name: 'Fuchsia', color: '#d946ef' },
   { name: 'Pink', color: '#ec4899' },
+  { name: 'Slate Gray', color: '#64748b' },
   { name: 'White', color: '#ffffff' },
-  { name: 'Dark', color: '#0f172a' },
+  { name: 'Dark Slate', color: '#0f172a' },
 ];
 
 // Toolbar Component for TipTap
@@ -226,6 +268,60 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
     >
       <button type="button" onClick={handleDecreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 13}} title="Decrease font size">A-</button>
       <button type="button" onClick={handleIncreaseFont} style={{...btnStyle(false), fontWeight: 700, fontSize: 15}} title="Increase font size">A+</button>
+      
+      <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 2px', flexShrink: 0 }} />
+
+      {/* Font Family Selector Dropdown */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}15` }}>
+        <Type size={14} style={{ color: color, opacity: 0.8, marginLeft: 2 }} />
+        <select
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === 'inherit') {
+              editor.chain().focus().unsetFontFamily().run();
+            } else {
+              editor.chain().focus().setFontFamily(val).run();
+            }
+          }}
+          value={editor.getAttributes('textStyle').fontFamily || 'inherit'}
+          style={{
+            background: 'transparent',
+            color: color,
+            border: 'none',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            height: 24,
+            outline: 'none',
+            maxWidth: 150,
+          }}
+          title="Select Font Style (including handwriting scripts)"
+        >
+          <option value="inherit" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+            Default Font
+          </option>
+          <optgroup label="✍️ Handwriting Script" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+            <option value="'Caveat', cursive">Caveat (Handwriting)</option>
+            <option value="'Dancing Script', cursive">Dancing Script (Cursive)</option>
+            <option value="'Pacifico', cursive">Pacifico (Bold Script)</option>
+            <option value="'Indie Flower', cursive">Indie Flower (Casual)</option>
+            <option value="'Architects Daughter', cursive">Architects Daughter</option>
+            <option value="'Shadows Into Light', cursive">Shadows Into Light</option>
+            <option value="'Kalam', cursive">Kalam (Calligraphy)</option>
+          </optgroup>
+          <optgroup label="Modern Sans-Serif" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+            <option value="'Poppins', sans-serif">Poppins</option>
+            <option value="'Montserrat', sans-serif">Montserrat</option>
+          </optgroup>
+          <optgroup label="Classic Serif" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+            <option value="'Merriweather', serif">Merriweather</option>
+            <option value="'Playfair Display', serif">Playfair Display</option>
+          </optgroup>
+          <optgroup label="Developer Monospace" style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+            <option value="'Fira Code', monospace">Fira Code</option>
+          </optgroup>
+        </select>
+      </div>
       <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 2px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} style={btnStyle(editor.isActive('bold'))}><Bold size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} style={btnStyle(editor.isActive('italic'))}><Italic size={16} /></button>
@@ -340,7 +436,7 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
 
         <div style={{ width: 1, height: 16, background: `${color}20`, margin: '0 2px' }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: 380, padding: '2px 0' }}>
           {TEXT_COLORS.map(tc => {
             const isSelected = editor.getAttributes('textStyle').color === tc.color || activeTextColor === tc.color;
             return (
@@ -368,6 +464,30 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
             );
           })}
 
+          {/* Custom Hex Color Picker Input */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexShrink: 0 }} title="Choose any custom color">
+            <input
+              type="color"
+              value={activeTextColor.startsWith('#') && activeTextColor.length === 7 ? activeTextColor : '#ef4444'}
+              onChange={(e) => {
+                const customHex = e.target.value;
+                setActiveTextColor(customHex);
+                editor.chain().focus().setColor(customHex).run();
+              }}
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                border: '2px solid var(--accent)',
+                cursor: 'pointer',
+                padding: 0,
+                backgroundColor: 'transparent',
+                overflow: 'hidden',
+                flexShrink: 0
+              }}
+            />
+          </div>
+
           <button
             type="button"
             onClick={() => editor.chain().focus().unsetColor().run()}
@@ -384,7 +504,8 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
               height: 22,
               display: 'flex',
               alignItems: 'center',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}
             title="Reset Text Color to default"
           >
@@ -516,6 +637,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
       TextStyle,
       FontSize,
       FontColor,
+      FontFamily,
       TabIndent,
       Image.configure({
         inline: false,
