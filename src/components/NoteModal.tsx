@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette } from 'lucide-react';
+import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette, Image as ImageIcon } from 'lucide-react';
 import { Note } from '@/types/note';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
+import Image from '@tiptap/extension-image';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Extension } from '@tiptap/core';
+import { compressImageFile } from '@/lib/noteUtils';
 
 // Custom extension for font size
 const FontSize = Extension.create({
@@ -143,8 +145,20 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
   const [activeTextColor, setActiveTextColor] = useState('#ef4444');
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!editor) return null;
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const dataUrl = await compressImageFile(files[0]);
+      if (dataUrl) {
+        editor.chain().focus().setImage({ src: dataUrl }).run();
+      }
+    }
+    e.target.value = '';
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -385,6 +399,30 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
       <div style={{ width: 1, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} style={btnStyle(editor.isActive('bulletList'))}><List size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} style={btnStyle(editor.isActive('orderedList'))}><ListOrdered size={16} /></button>
+      <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 4px', flexShrink: 0 }} />
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          ...btnStyle(false),
+          gap: 5,
+          padding: '3px 8px',
+          height: 26,
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+        title="Insert Image (or paste clipboard image directly with Ctrl+V)"
+      >
+        <ImageIcon size={15} />
+        <span style={{ fontSize: 11 }}>Image</span>
+      </button>
     </div>
   );
 };
@@ -472,11 +510,70 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
   };
 
   const editor = useEditor({
-    extensions: [StarterKit, Highlight.configure({ multicolor: true }), TextStyle, FontSize, FontColor, TabIndent],
+    extensions: [
+      StarterKit,
+      Highlight.configure({ multicolor: true }),
+      TextStyle,
+      FontSize,
+      FontColor,
+      TabIndent,
+      Image.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'note-editor-image',
+        },
+      }),
+    ],
     content: '',
     editorProps: {
       attributes: {
         class: 'tiptap-editor',
+      },
+      handlePaste(view, event) {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith('image/')) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (file) {
+              compressImageFile(file).then((dataUrl) => {
+                if (dataUrl && view.state) {
+                  const node = view.state.schema.nodes.image.create({ src: dataUrl });
+                  const transaction = view.state.tr.replaceSelectionWith(node);
+                  view.dispatch(transaction);
+                }
+              });
+              return true;
+            }
+          }
+        }
+        return false;
+      },
+      handleDrop(view, event, slice, moved) {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+          const file = event.dataTransfer.files[0];
+          if (file.type.startsWith('image/')) {
+            event.preventDefault();
+            compressImageFile(file).then((dataUrl) => {
+              if (dataUrl && view.state) {
+                const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                const node = view.state.schema.nodes.image.create({ src: dataUrl });
+                if (coordinates) {
+                  const transaction = view.state.tr.insert(coordinates.pos, node);
+                  view.dispatch(transaction);
+                } else {
+                  const transaction = view.state.tr.replaceSelectionWith(node);
+                  view.dispatch(transaction);
+                }
+              }
+            });
+            return true;
+          }
+        }
+        return false;
       },
     },
     onUpdate({ editor: ed }) {
@@ -912,6 +1009,9 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
             .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; }
             .tiptap-editor li { margin: 0; line-height: 32px; caret-color: ${textColor} !important; }
             .tiptap-editor mark { color: #0f172a !important; padding: 2px 5px; border-radius: 4px; font-weight: 500; }
+            .tiptap-editor img, img.note-editor-image { max-width: 100%; max-height: 520px; object-fit: contain; border-radius: 12px; margin: 12px 0; display: block; box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.12); cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+            .tiptap-editor img:hover, img.note-editor-image:hover { transform: scale(1.005); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+            .tiptap-editor img.ProseMirror-selectednode, img.note-editor-image.ProseMirror-selectednode { outline: 3px solid #3b82f6 !important; border-radius: 12px; }
             .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 32px; line-height: 32px; pointer-events: none; }
 
             @media (max-width: 640px) {

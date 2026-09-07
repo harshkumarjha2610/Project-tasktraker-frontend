@@ -82,7 +82,7 @@ export default function EnglishPracticePage() {
 
   // Statistics
   const totalMinutes = useMemo(() => logs.reduce((acc, l) => acc + (l.durationMinutes || 0), 0), [logs]);
-  const totalVocabCount = useMemo(() => logs.reduce((acc, l) => acc + (l.vocabulary?.length || 0), [logs]), [logs]);
+  const totalVocabCount = useMemo(() => logs.reduce((acc, l) => acc + (l.vocabulary?.length || 0), 0), [logs]);
   
   const todayMinutes = useMemo(() => {
     const todayStr = new Date().toDateString();

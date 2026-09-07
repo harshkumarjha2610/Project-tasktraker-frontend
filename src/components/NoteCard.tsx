@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { Note } from '@/types/note';
-import { Trash2, Layers, Calendar, FileText, Check, Copy } from 'lucide-react';
+import { Trash2, Layers, Calendar, FileText, Check, Copy, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import { parseNoteContent, stripHtml } from '@/lib/noteUtils';
+import { parseNoteContent, stripHtml, extractImagesFromContent } from '@/lib/noteUtils';
 
 interface NoteCardProps {
   note: Note;
@@ -81,7 +81,7 @@ const COLOR_THEMES: Record<string, { accent: string; bg: string; border: string;
 };
 
 export default function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
-  const { tabs } = parseNoteContent(note.content);
+  const { tabs, images } = parseNoteContent(note.content);
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   const [copied, setCopied] = useState(false);
 
@@ -91,6 +91,7 @@ export default function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
   const isLight = isPaper || cardColor === 'white';
   const activeTab = tabs[activeTabIdx] || tabs[0];
   const activeText = activeTab ? stripHtml(activeTab.content) : '';
+  const activeTabImages = activeTab ? extractImagesFromContent(activeTab.content) : [];
   const legacyTitle = note.title && note.title.trim();
 
   // Calculate word count for active tab or total note
@@ -303,6 +304,46 @@ export default function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           </h3>
         ) : null}
 
+        {/* Thumbnail Preview for Images */}
+        {activeTabImages.length > 0 && (
+          <div
+            style={{
+              marginBottom: 10,
+              borderRadius: 10,
+              overflow: 'hidden',
+              height: 110,
+              width: '100%',
+              position: 'relative',
+              background: 'rgba(0, 0, 0, 0.15)',
+              border: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
+            }}
+          >
+            <img
+              src={activeTabImages[0]}
+              alt="Pasted Note Image"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            {activeTabImages.length > 1 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: 6,
+                  right: 6,
+                  background: 'rgba(0, 0, 0, 0.75)',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: 10,
+                  backdropFilter: 'blur(4px)',
+                }}
+              >
+                +{activeTabImages.length - 1} more
+              </span>
+            )}
+          </div>
+        )}
+
         {activeText ? (
           <p
             style={{
@@ -312,14 +353,14 @@ export default function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
               color: theme.subtext,
               wordBreak: 'break-word',
               display: '-webkit-box',
-              WebkitLineClamp: legacyTitle ? 4 : 6,
+              WebkitLineClamp: activeTabImages.length > 0 ? 2 : legacyTitle ? 4 : 6,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
             }}
           >
             {activeText}
           </p>
-        ) : (
+        ) : activeTabImages.length > 0 ? null : (
           <p
             style={{
               margin: 0,
@@ -352,7 +393,26 @@ export default function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           {format(new Date(note.updatedAt || note.createdAt), 'MMM d, yyyy')}
         </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {images.length > 0 && (
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                background: theme.badgeBg,
+                color: theme.accent,
+                padding: '2px 8px',
+                borderRadius: '8px',
+                fontSize: '11px',
+                fontWeight: 600,
+              }}
+              title={`${images.length} pasted images in note`}
+            >
+              <ImageIcon size={11} /> {images.length} {images.length === 1 ? 'image' : 'images'}
+            </span>
+          )}
+
           {tabs.length > 1 && (
             <span
               style={{

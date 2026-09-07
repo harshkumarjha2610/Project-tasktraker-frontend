@@ -13,7 +13,7 @@ import {
   Plus, CheckCircle, Circle, Loader, AlertTriangle, TrendingUp, Flame,
   Clock, Target, StickyNote, Zap, ShieldAlert, BarChart3, PieChart,
   ArrowUpRight, Award, CheckCircle2, ChevronRight, Layers, FileText,
-  Activity, Sparkles
+  Activity, Sparkles, Database, HardDrive
 } from 'lucide-react';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
 
@@ -32,6 +32,15 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   medium: '#ca8a04',
   low: '#16a34a',
 };
+
+function formatBytes(bytes: number, decimals = 1): string {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
 
 export default function DashboardPage() {
   const { tasks, addTask, editTask, removeTask, toggleComplete, loading: tasksLoading, error: tasksError } = useTaskContext();
@@ -125,6 +134,35 @@ export default function DashboardPage() {
 
     return { totalWastedSessions, totalWastedSecondsAllTime, overdueDelaySessions };
   }, [wasteHistory]);
+
+  // ─── 5. Data Storage Metrics ─────────────────────────────────────
+  const storageStats = useMemo(() => {
+    const notesBytes = notes.length > 0 ? new Blob([JSON.stringify(notes)]).size : 0;
+    const tasksBytes = tasks.length > 0 ? new Blob([JSON.stringify(tasks)]).size : 0;
+    const pomodoroBytes = (pomodoroHistory.length > 0 || wasteHistory.length > 0)
+      ? new Blob([JSON.stringify({ pomodoroHistory, wasteHistory })]).size
+      : 0;
+
+    const totalBytes = notesBytes + tasksBytes + pomodoroBytes;
+
+    const notesPct = totalBytes > 0 ? Math.round((notesBytes / totalBytes) * 100) : 0;
+    const tasksPct = totalBytes > 0 ? Math.round((tasksBytes / totalBytes) * 100) : 0;
+    const pomodoroPct = totalBytes > 0 ? Math.round((pomodoroBytes / totalBytes) * 100) : 0;
+
+    return {
+      notesBytes,
+      tasksBytes,
+      pomodoroBytes,
+      totalBytes,
+      notesPct,
+      tasksPct,
+      pomodoroPct,
+      formattedNotes: formatBytes(notesBytes),
+      formattedTasks: formatBytes(tasksBytes),
+      formattedPomodoro: formatBytes(pomodoroBytes),
+      formattedTotal: formatBytes(totalBytes),
+    };
+  }, [notes, tasks, pomodoroHistory, wasteHistory]);
 
   // Task Lists
   const todayTasks = useMemo(() =>
@@ -275,6 +313,25 @@ export default function DashboardPage() {
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Distraction Logs</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
             {wasteStats.overdueDelaySessions} overdue break delays
+          </div>
+        </div>
+
+        {/* KPI 5: Data Storage Usage */}
+        <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.03))', border: '1px solid rgba(16,185,129,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(16,185,129,0.18)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Database size={20} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.15)', padding: '3px 8px', borderRadius: 6 }}>
+              Data Space
+            </span>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>
+            {storageStats.formattedTotal}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Space Filled</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            Notes: {storageStats.notesPct}% • Tasks: {storageStats.tasksPct}% • Pomo: {storageStats.pomodoroPct}%
           </div>
         </div>
       </div>
@@ -635,6 +692,114 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* ── ANALYTICS CARD 5: Data Storage & Space Filled ── */}
+        <div style={{
+          gridColumn: '1 / -1',
+          padding: '22px 24px',
+          borderRadius: 20,
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(16,185,129,0.18)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <HardDrive size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Data Storage & Space Filled</h3>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Memory payload distribution across Notes, Tasks, and Pomodoro</span>
+              </div>
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, background: 'rgba(16,185,129,0.15)', color: '#10b981', padding: '4px 12px', borderRadius: 20, border: '1px solid rgba(16,185,129,0.3)' }}>
+              💾 {storageStats.formattedTotal} Total Filled
+            </span>
+          </div>
+
+          {/* Stacked Percentage Visual Bar */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+              <span>Space Distribution Overview</span>
+              <span>{storageStats.formattedTotal} Total Payload</span>
+            </div>
+            <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 6, overflow: 'hidden', display: 'flex', border: '1px solid var(--border)' }}>
+              <div
+                style={{ height: '100%', width: `${storageStats.notesPct}%`, background: '#f59e0b', transition: 'width 0.3s ease' }}
+                title={`Notes Space: ${storageStats.formattedNotes} (${storageStats.notesPct}%)`}
+              />
+              <div
+                style={{ height: '100%', width: `${storageStats.tasksPct}%`, background: '#8b5cf6', transition: 'width 0.3s ease' }}
+                title={`Tasks Space: ${storageStats.formattedTasks} (${storageStats.tasksPct}%)`}
+              />
+              <div
+                style={{ height: '100%', width: `${storageStats.pomodoroPct}%`, background: '#06b6d4', transition: 'width 0.3s ease' }}
+                title={`Pomodoro Space: ${storageStats.formattedPomodoro} (${storageStats.pomodoroPct}%)`}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 8, flexWrap: 'wrap', gap: 10 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b' }} />
+                Notes: <strong style={{ color: 'var(--text-primary)' }}>{storageStats.formattedNotes}</strong> ({storageStats.notesPct}%)
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#8b5cf6' }} />
+                Tasks: <strong style={{ color: 'var(--text-primary)' }}>{storageStats.formattedTasks}</strong> ({storageStats.tasksPct}%)
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#06b6d4' }} />
+                Pomodoro: <strong style={{ color: 'var(--text-primary)' }}>{storageStats.formattedPomodoro}</strong> ({storageStats.pomodoroPct}%)
+              </span>
+            </div>
+          </div>
+
+          {/* Detailed Storage Grid Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 14 }}>
+            {/* Notes Storage Card */}
+            <div style={{ padding: '16px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📝 Notes Space</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', background: 'rgba(245,158,11,0.12)', padding: '2px 6px', borderRadius: 6 }}>{storageStats.notesPct}%</span>
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', marginTop: 8, marginBottom: 2 }}>
+                {storageStats.formattedNotes}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {notes.length} {notes.length === 1 ? 'note' : 'notes'} (includes text & pasted images)
+              </span>
+            </div>
+
+            {/* Tasks Storage Card */}
+            <div style={{ padding: '16px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)', borderLeft: '4px solid #8b5cf6' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📋 Tasks Space</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', background: 'rgba(139,92,246,0.12)', padding: '2px 6px', borderRadius: 6 }}>{storageStats.tasksPct}%</span>
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', marginTop: 8, marginBottom: 2 }}>
+                {storageStats.formattedTasks}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} records & priority data
+              </span>
+            </div>
+
+            {/* Pomodoro Storage Card */}
+            <div style={{ padding: '16px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)', borderLeft: '4px solid #06b6d4' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '0.5px' }}>⏱️ Pomodoro Space</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', background: 'rgba(6,186,212,0.12)', padding: '2px 6px', borderRadius: 6 }}>{storageStats.pomodoroPct}%</span>
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', marginTop: 8, marginBottom: 2 }}>
+                {storageStats.formattedPomodoro}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {pomodoroHistory.length} focus sessions + {wasteHistory.length} distraction logs
+              </span>
+            </div>
           </div>
         </div>
 
