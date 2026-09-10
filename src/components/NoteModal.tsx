@@ -130,6 +130,7 @@ interface NoteTab {
 }
 
 const COLORS = [
+  { value: 'black', label: 'Pitch Black (Double Line)', hex: '#000000', accent: '#38bdf8' },
   { value: 'paper', label: 'Paper Notebook', hex: '#fcfaf2', accent: '#d97706' },
   { value: 'white', label: 'Pure White', hex: '#ffffff', accent: '#475569' },
   { value: 'dark', label: 'Dark Midnight', hex: '#14141e', accent: '#8b5cf6' },
@@ -140,6 +141,7 @@ const COLORS = [
 ];
 
 const TEXT_COLOR_MAP: Record<string, string> = {
+  black: '#ffffff',
   paper: '#1a1a24',
   white: '#0f172a',
   dark: '#ffffff',
@@ -1158,12 +1160,10 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
                 max-width: 130px;
               }
               .note-editor-container {
-                padding: 4px 16px 24px 44px !important;
-                background-image: ${color === 'paper' 
-                  ? `linear-gradient(to right, transparent 24px, #ef4444cc 24px, #ef4444cc 25.5px, transparent 25.5px),
-                     linear-gradient(to right, transparent 28px, #ef4444cc 28px, #ef4444cc 29.5px, transparent 29.5px),
-                     repeating-linear-gradient(transparent, transparent 31px, rgba(59, 130, 246, 0.2) 31px, rgba(59, 130, 246, 0.2) 32px)`
-                  : 'none'} !important;
+                padding: ${color === 'white' ? '24px 16px 24px 16px' : '4px 16px 24px 44px'} !important;
+                background-image: ${color === 'white' ? 'none' : `linear-gradient(to right, transparent 24px, #ef4444cc 24px, #ef4444cc 25.5px, transparent 25.5px),
+                   linear-gradient(to right, transparent 28px, #ef4444cc 28px, #ef4444cc 29.5px, transparent 29.5px),
+                   repeating-linear-gradient(transparent, transparent 31px, ${color === 'paper' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.12)'} 31px, ${color === 'paper' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.12)'} 32px)`} !important;
               }
             }
           `}} />
@@ -1176,13 +1176,11 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
               display: 'flex', 
               flexDirection: 'column', 
               position: 'relative',
-              padding: color === 'paper' ? '4px 32px 32px 92px' : '24px 32px 32px 32px', 
+              padding: color === 'white' ? '24px 32px 32px 32px' : '4px 32px 32px 92px', 
               overflowY: 'auto',
-              backgroundImage: color === 'paper' 
-                ? `linear-gradient(to right, transparent 67px, #ef4444cc 67px, #ef4444cc 68.5px, transparent 68.5px),
-                   linear-gradient(to right, transparent 72px, #ef4444cc 72px, #ef4444cc 73.5px, transparent 73.5px),
-                   repeating-linear-gradient(transparent, transparent 31px, rgba(59, 130, 246, 0.2) 31px, rgba(59, 130, 246, 0.2) 32px)`
-                : 'none',
+              backgroundImage: color === 'white' ? 'none' : `linear-gradient(to right, transparent 67px, #ef4444cc 67px, #ef4444cc 68.5px, transparent 68.5px),
+                 linear-gradient(to right, transparent 72px, #ef4444cc 72px, #ef4444cc 73.5px, transparent 73.5px),
+                 repeating-linear-gradient(transparent, transparent 31px, ${color === 'paper' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.12)'} 31px, ${color === 'paper' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.12)'} 32px)`,
               backgroundPosition: '0 0',
               backgroundAttachment: 'local',
             }}

@@ -10,6 +10,7 @@ import { parseNoteContent } from '@/lib/noteUtils';
 
 const COLOR_FILTERS = [
   { id: 'all', label: 'All Notes', color: 'var(--accent)' },
+  { id: 'black', label: 'Pitch Black', color: '#000000' },
   { id: 'paper', label: 'Paper', color: '#d97706' },
   { id: 'white', label: 'Pure White', color: '#64748b' },
   { id: 'dark', label: 'Dark', color: '#8b5cf6' },

@@ -5,13 +5,14 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CheckSquare, BarChart3, Tag, Settings,
   Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen, Gamepad2, StickyNote, Hourglass, Timer,
-  Languages, UserPlus
+  Languages, UserPlus, Briefcase
 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 
 const NAV_ITEMS = [
   { href: '/',                  icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/tasks',             icon: CheckSquare,     label: 'Tasks' },
+  { href: '/job-tracker',       icon: Briefcase,       label: 'Daily Job Tracker' },
   { href: '/english-practice',  icon: Languages,        label: 'English Practice' },
   { href: '/client-approaches', icon: UserPlus,         label: 'Client Approaches' },
   { href: '/notes',             icon: StickyNote,      label: 'Notes' },

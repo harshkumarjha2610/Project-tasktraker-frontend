@@ -402,5 +402,116 @@ export async function deleteClientApproach(id: string): Promise<void> {
   }
 }
 
+// ─── Daily Job Tracker API ─────────────────────────────────────
+import { JobRecord } from '@/types/jobTracker';
+
+function normalizeJobRecord(raw: Record<string, unknown>): JobRecord {
+  return {
+    id: String(raw._id ?? raw.id),
+    company: (raw.company as string) || '',
+    position: (raw.position as string) || '',
+    platform: (raw.platform as JobRecord['platform']) || 'linkedin',
+    jobType: (raw.jobType as JobRecord['jobType']) || 'full_time',
+    workMode: (raw.workMode as JobRecord['workMode']) || 'remote',
+    salary: (raw.salary as string) || '',
+    status: (raw.status as JobRecord['status']) || 'applied',
+    appliedDate: (raw.appliedDate as string) ?? new Date().toISOString(),
+    jobUrl: (raw.jobUrl as string) || '',
+    contactInfo: (raw.contactInfo as string) || '',
+    location: (raw.location as string) || '',
+    notes: (raw.notes as string) || '',
+    followUpDate: raw.followUpDate as string | undefined,
+    rating: Number(raw.rating || 3),
+    createdAt: (raw.createdAt as string) ?? new Date().toISOString(),
+  };
+}
+
+export async function getJobs(params?: { status?: string; platform?: string; search?: string }): Promise<JobRecord[]> {
+  try {
+    const qs = params
+      ? '?' + new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v && v !== 'all') as [string, string][]
+        ).toString()
+      : '';
+    const res = await request<{ data: Record<string, unknown>[] }>(`/jobs${qs}`);
+    return res.data.map(normalizeJobRecord);
+  } catch (err) {
+    console.warn('[API] Jobs backend offline, loading from localStorage fallback');
+    const local = localStorage.getItem('dt_job_tracker_items');
+    let items: JobRecord[] = local ? JSON.parse(local) : [];
+    if (params) {
+      if (params.status && params.status !== 'all') {
+        items = items.filter(i => i.status === params.status);
+      }
+      if (params.platform && params.platform !== 'all') {
+        items = items.filter(i => i.platform === params.platform);
+      }
+      if (params.search) {
+        const q = params.search.toLowerCase();
+        items = items.filter(i => 
+          i.company.toLowerCase().includes(q) || 
+          i.position.toLowerCase().includes(q) || 
+          i.notes?.toLowerCase().includes(q)
+        );
+      }
+    }
+    return items;
+  }
+}
+
+export async function createJob(payload: Omit<JobRecord, 'id'>): Promise<JobRecord> {
+  try {
+    const res = await request<{ data: Record<string, unknown> }>('/jobs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return normalizeJobRecord(res.data);
+  } catch (err) {
+    console.warn('[API] Jobs backend error, saving to localStorage');
+    const local = localStorage.getItem('dt_job_tracker_items');
+    const items: JobRecord[] = local ? JSON.parse(local) : [];
+    const newItem: JobRecord = { ...payload, id: 'job_loc_' + Date.now() };
+    items.unshift(newItem);
+    localStorage.setItem('dt_job_tracker_items', JSON.stringify(items));
+    return newItem;
+  }
+}
+
+export async function updateJob(id: string, updates: Partial<JobRecord>): Promise<JobRecord> {
+  try {
+    const res = await request<{ data: Record<string, unknown> }>(`/jobs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+    return normalizeJobRecord(res.data);
+  } catch (err) {
+    const local = localStorage.getItem('dt_job_tracker_items');
+    let items: JobRecord[] = local ? JSON.parse(local) : [];
+    let updated: JobRecord | null = null;
+    items = items.map(item => {
+      if (item.id === id) {
+        updated = { ...item, ...updates };
+        return updated;
+      }
+      return item;
+    });
+    localStorage.setItem('dt_job_tracker_items', JSON.stringify(items));
+    return updated || ({ ...updates, id } as JobRecord);
+  }
+}
+
+export async function deleteJob(id: string): Promise<void> {
+  try {
+    await request(`/jobs/${id}`, { method: 'DELETE' });
+  } catch (err) {
+    const local = localStorage.getItem('dt_job_tracker_items');
+    if (local) {
+      const items: JobRecord[] = JSON.parse(local);
+      localStorage.setItem('dt_job_tracker_items', JSON.stringify(items.filter(i => i.id !== id)));
+    }
+  }
+}
+
+
 
 

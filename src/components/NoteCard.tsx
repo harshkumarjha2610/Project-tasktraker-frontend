@@ -12,7 +12,7 @@ interface NoteCardProps {
   onDelete: (id: string) => void;
 }
 
-// Themes mapping including Paper (Default) & Pure White with Notebook line rules
+// Themes mapping including Paper (Default), Pure White & Pitch Black with Notebook line rules
 const COLOR_THEMES: Record<string, { accent: string; bg: string; border: string; text: string; subtext: string; badgeBg: string; lineRule: string }> = {
   default: {
     accent: '#d97706',
@@ -41,6 +41,15 @@ const COLOR_THEMES: Record<string, { accent: string; bg: string; border: string;
     badgeBg: '#f1f5f9',
     lineRule: 'rgba(148, 163, 184, 0.16)',
   },
+  black: {
+    accent: '#38bdf8',
+    bg: '#000000',
+    border: '#262626',
+    text: '#ffffff',
+    subtext: '#d1d5db',
+    badgeBg: '#171717',
+    lineRule: 'rgba(255, 255, 255, 0.12)',
+  },
   dark: {
     accent: '#8b5cf6',
     bg: '#14141e',
@@ -48,7 +57,7 @@ const COLOR_THEMES: Record<string, { accent: string; bg: string; border: string;
     text: '#ffffff',
     subtext: '#cccccc',
     badgeBg: '#231f3d',
-    lineRule: 'rgba(255, 255, 255, 0.05)',
+    lineRule: 'rgba(255, 255, 255, 0.08)',
   },
   red: {
     accent: '#ef4444',
