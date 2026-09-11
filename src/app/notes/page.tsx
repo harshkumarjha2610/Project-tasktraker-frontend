@@ -10,10 +10,10 @@ import { parseNoteContent } from '@/lib/noteUtils';
 
 const COLOR_FILTERS = [
   { id: 'all', label: 'All Notes', color: 'var(--accent)' },
-  { id: 'black', label: 'Pitch Black', color: '#000000' },
-  { id: 'paper', label: 'Paper', color: '#d97706' },
+  { id: 'black', label: 'Pitch Black (Double Line)', color: '#38bdf8' },
+  { id: 'paper', label: 'Paper Notebook', color: '#d97706' },
   { id: 'white', label: 'Pure White', color: '#64748b' },
-  { id: 'dark', label: 'Dark', color: '#8b5cf6' },
+  { id: 'dark', label: 'Dark Midnight', color: '#8b5cf6' },
   { id: 'red', label: 'Red', color: '#ef4444' },
   { id: 'blue', label: 'Blue', color: '#3b82f6' },
   { id: 'green', label: 'Green', color: '#10b981' },
@@ -75,7 +75,8 @@ export default function NotesPage() {
   };
 
   const openNewNote = () => {
-    setEditingNote(undefined);
+    const initialColor = selectedColor !== 'all' ? selectedColor : 'black';
+    setEditingNote({ color: initialColor } as Note);
     setIsModalOpen(true);
   };
 

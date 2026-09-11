@@ -13,7 +13,7 @@ interface NoteCardProps {
 }
 
 // Themes mapping including Paper (Default), Pure White & Pitch Black with Notebook line rules
-const COLOR_THEMES: Record<string, { accent: string; bg: string; border: string; text: string; subtext: string; badgeBg: string; lineRule: string }> = {
+const COLOR_THEMES: Record<string, { accent: string; bg: string; border: string; text: string; subtext: string; badgeBg: string; lineRule: string; lineRule2?: string; isDoubleLine?: boolean }> = {
   default: {
     accent: '#d97706',
     bg: '#fcfaf2',
@@ -43,21 +43,25 @@ const COLOR_THEMES: Record<string, { accent: string; bg: string; border: string;
   },
   black: {
     accent: '#38bdf8',
-    bg: '#000000',
-    border: '#262626',
+    bg: '#050508',
+    border: '#222236',
     text: '#ffffff',
     subtext: '#d1d5db',
-    badgeBg: '#171717',
-    lineRule: 'rgba(255, 255, 255, 0.12)',
+    badgeBg: '#12121c',
+    lineRule: 'rgba(255, 255, 255, 0.22)',
+    lineRule2: 'rgba(56, 189, 248, 0.22)',
+    isDoubleLine: true,
   },
   dark: {
     accent: '#8b5cf6',
-    bg: '#14141e',
-    border: '#252536',
+    bg: '#0f0f18',
+    border: '#252538',
     text: '#ffffff',
     subtext: '#cccccc',
-    badgeBg: '#231f3d',
-    lineRule: 'rgba(255, 255, 255, 0.08)',
+    badgeBg: '#1e1a38',
+    lineRule: 'rgba(255, 255, 255, 0.18)',
+    lineRule2: 'rgba(139, 92, 246, 0.22)',
+    isDoubleLine: true,
   },
   red: {
     accent: '#ef4444',
@@ -145,7 +149,9 @@ export default function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
           ? '0 6px 18px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05)'
           : '0 8px 24px rgba(0, 0, 0, 0.4)',
         transition: 'all 0.22s ease-in-out',
-        backgroundImage: `repeating-linear-gradient(transparent, transparent 27px, ${theme.lineRule} 27px, ${theme.lineRule} 28px)`,
+        backgroundImage: theme.isDoubleLine
+          ? `repeating-linear-gradient(transparent, transparent 23px, ${theme.lineRule} 23px, ${theme.lineRule} 24px, transparent 24px, transparent 26px, ${theme.lineRule2 || theme.lineRule} 26px, ${theme.lineRule2 || theme.lineRule} 27px)`
+          : `repeating-linear-gradient(transparent, transparent 27px, ${theme.lineRule} 27px, ${theme.lineRule} 28px)`,
         backgroundPosition: '0 44px',
       }}
       onMouseEnter={(e) => {

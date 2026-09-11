@@ -130,14 +130,14 @@ interface NoteTab {
 }
 
 const COLORS = [
-  { value: 'black', label: 'Pitch Black (Double Line)', hex: '#000000', accent: '#38bdf8' },
+  { value: 'black', label: 'Pitch Black (Double Line Notebook)', hex: '#050508', accent: '#38bdf8' },
   { value: 'paper', label: 'Paper Notebook', hex: '#fcfaf2', accent: '#d97706' },
   { value: 'white', label: 'Pure White', hex: '#ffffff', accent: '#475569' },
-  { value: 'dark', label: 'Dark Midnight', hex: '#14141e', accent: '#8b5cf6' },
-  { value: 'red', label: 'Red', hex: '#251216', accent: '#ef4444' },
-  { value: 'blue', label: 'Blue', hex: '#0f1a2e', accent: '#3b82f6' },
-  { value: 'green', label: 'Green', hex: '#0d2218', accent: '#10b981' },
-  { value: 'yellow', label: 'Yellow', hex: '#261b0c', accent: '#f59e0b' },
+  { value: 'dark', label: 'Dark Midnight (Double Line Notebook)', hex: '#0f0f18', accent: '#8b5cf6' },
+  { value: 'red', label: 'Red Notebook', hex: '#251216', accent: '#ef4444' },
+  { value: 'blue', label: 'Blue Notebook', hex: '#0f1a2e', accent: '#3b82f6' },
+  { value: 'green', label: 'Green Notebook', hex: '#0d2218', accent: '#10b981' },
+  { value: 'yellow', label: 'Yellow Notebook', hex: '#261b0c', accent: '#f59e0b' },
 ];
 
 const TEXT_COLOR_MAP: Record<string, string> = {
@@ -731,7 +731,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           editor?.commands.setContent(initialData.content || '');
         }
       } else {
-        setColor('paper');
+        setColor('black');
         setTabs([{ id: '1', name: 'Main', content: '' }]);
         setActiveTabId('1');
         editor?.commands.setContent('');
@@ -860,6 +860,22 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
   const textColor = TEXT_COLOR_MAP[color] || TEXT_COLOR_MAP.default;
   const isDefault = color === 'default';
 
+  const horizontalRuleGradient = color === 'black'
+    ? 'repeating-linear-gradient(transparent 0px, transparent 27px, rgba(255, 255, 255, 0.22) 27px, rgba(255, 255, 255, 0.22) 28px, transparent 28px, transparent 30px, rgba(56, 189, 248, 0.22) 30px, rgba(56, 189, 248, 0.22) 31px)'
+    : color === 'dark'
+    ? 'repeating-linear-gradient(transparent 0px, transparent 27px, rgba(255, 255, 255, 0.18) 27px, rgba(255, 255, 255, 0.18) 28px, transparent 28px, transparent 30px, rgba(139, 92, 246, 0.22) 30px, rgba(139, 92, 246, 0.22) 31px)'
+    : color === 'paper'
+    ? 'repeating-linear-gradient(transparent 0px, transparent 31px, rgba(59, 130, 246, 0.2) 31px, rgba(59, 130, 246, 0.2) 32px)'
+    : 'repeating-linear-gradient(transparent 0px, transparent 31px, rgba(255, 255, 255, 0.12) 31px, rgba(255, 255, 255, 0.12) 32px)';
+
+  const desktopBgImage = color === 'white' ? 'none' : `linear-gradient(to right, transparent 67px, #ef4444cc 67px, #ef4444cc 68.5px, transparent 68.5px),
+     linear-gradient(to right, transparent 72px, #ef4444cc 72px, #ef4444cc 73.5px, transparent 73.5px),
+     ${horizontalRuleGradient}`;
+
+  const mobileBgImage = color === 'white' ? 'none' : `linear-gradient(to right, transparent 24px, #ef4444cc 24px, #ef4444cc 25.5px, transparent 25.5px),
+     linear-gradient(to right, transparent 28px, #ef4444cc 28px, #ef4444cc 29.5px, transparent 29.5px),
+     ${horizontalRuleGradient}`;
+
   return (
     <div 
       className="modal-overlay open note-modal-overlay" 
@@ -899,6 +915,48 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           resize: isMaximized ? 'none' : 'both',
         }}
       >
+        {/* Metallic Spiral Binder Loops along Left Edge */}
+        {color !== 'white' && (
+          <div
+            className="hide-on-mobile"
+            style={{
+              position: 'absolute',
+              left: '12px',
+              top: '115px',
+              bottom: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-around',
+              zIndex: 10,
+              pointerEvents: 'none',
+            }}
+          >
+            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: color === 'paper' ? '#d2cbbd' : '#050508',
+                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)',
+                    border: color === 'paper' ? '1px solid #b8b0a0' : '1px solid #222238',
+                  }}
+                />
+                <div
+                  style={{
+                    width: 18,
+                    height: 5,
+                    borderRadius: 3,
+                    background: 'linear-gradient(180deg, #ffffff 0%, #cbd5e1 40%, #64748b 100%)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                    marginLeft: -5,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', zIndex: 1 }}>
           
@@ -987,6 +1045,29 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
                   <span style={{ color: '#ef4444' }}>Save failed</span>
                 )}
               </div>
+
+              {/* Notebook Style Indicator Badge */}
+              {color !== 'white' && (
+                <div
+                  className="hide-on-mobile"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '4px 10px',
+                    borderRadius: 12,
+                    backgroundColor: color === 'black' ? 'rgba(56, 189, 248, 0.15)' : `${textColor}0D`,
+                    border: color === 'black' ? '1px solid rgba(56, 189, 248, 0.3)' : `1px solid ${textColor}15`,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: color === 'black' ? '#38bdf8' : textColor,
+                    userSelect: 'none'
+                  }}
+                >
+                  <span>📓</span>
+                  <span>{color === 'black' ? 'Black Double-Line' : color === 'dark' ? 'Dark Double-Line' : 'Notebook Style'}</span>
+                </div>
+              )}
             </div>
 
             {/* Right side: Colors & Save */}
@@ -1161,9 +1242,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
               }
               .note-editor-container {
                 padding: ${color === 'white' ? '24px 16px 24px 16px' : '4px 16px 24px 44px'} !important;
-                background-image: ${color === 'white' ? 'none' : `linear-gradient(to right, transparent 24px, #ef4444cc 24px, #ef4444cc 25.5px, transparent 25.5px),
-                   linear-gradient(to right, transparent 28px, #ef4444cc 28px, #ef4444cc 29.5px, transparent 29.5px),
-                   repeating-linear-gradient(transparent, transparent 31px, ${color === 'paper' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.12)'} 31px, ${color === 'paper' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.12)'} 32px)`} !important;
+                background-image: ${mobileBgImage} !important;
               }
             }
           `}} />
@@ -1178,9 +1257,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
               position: 'relative',
               padding: color === 'white' ? '24px 32px 32px 32px' : '4px 32px 32px 92px', 
               overflowY: 'auto',
-              backgroundImage: color === 'white' ? 'none' : `linear-gradient(to right, transparent 67px, #ef4444cc 67px, #ef4444cc 68.5px, transparent 68.5px),
-                 linear-gradient(to right, transparent 72px, #ef4444cc 72px, #ef4444cc 73.5px, transparent 73.5px),
-                 repeating-linear-gradient(transparent, transparent 31px, ${color === 'paper' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.12)'} 31px, ${color === 'paper' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.12)'} 32px)`,
+              backgroundImage: desktopBgImage,
               backgroundPosition: '0 0',
               backgroundAttachment: 'local',
             }}
