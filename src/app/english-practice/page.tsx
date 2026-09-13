@@ -11,6 +11,7 @@ import {
   updateEnglishPracticeLog, deleteEnglishPracticeLog
 } from '@/lib/api';
 import { format, isSameDay, subDays } from 'date-fns';
+import FormattedPracticeNotes from '@/components/FormattedPracticeNotes';
 
 const PRACTICE_TYPES: { type: PracticeType; label: string; icon: any; color: string }[] = [
   { type: 'speaking',   label: 'Speaking',   icon: Mic,        color: '#8b5cf6' },
@@ -342,11 +343,8 @@ export default function EnglishPracticePage() {
                   </div>
                 </div>
 
-                {log.notes && (
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', background: 'var(--bg-main)', padding: '10px 14px', borderRadius: 8, lineHeight: 1.5, marginBottom: 12 }}>
-                    {log.notes}
-                  </p>
-                )}
+                {/* Formatted Notes & Learnings */}
+                <FormattedPracticeNotes notes={log.notes} />
 
                 {/* Vocabulary Cards */}
                 {log.vocabulary && log.vocabulary.length > 0 && (
@@ -465,14 +463,63 @@ export default function EnglishPracticePage() {
 
               {/* Notes */}
               <div>
-                <label style={labelStyle}>Key Learnings & Notes (optional)</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label style={labelStyle}>Key Learnings & Formatted Notes (optional)</label>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setNotes(prev => (prev ? `${prev}\n• ` : '• '))}
+                      style={tagBtnStyle}
+                      title="Add Bullet Point"
+                    >
+                      • Bullet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNotes(prev => (prev ? `${prev}\n[Takeaway] ` : '[Takeaway] '))}
+                      style={tagBtnStyle}
+                      title="Add Takeaway Badge"
+                    >
+                      ⭐ Takeaway
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNotes(prev => (prev ? `${prev}\n[Grammar] ` : '[Grammar] '))}
+                      style={tagBtnStyle}
+                      title="Add Grammar Badge"
+                    >
+                      📖 Grammar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNotes(prev => (prev ? `${prev}\n[Pronunciation] ` : '[Pronunciation] '))}
+                      style={tagBtnStyle}
+                      title="Add Pronunciation Badge"
+                    >
+                      🗣️ Pronunciate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNotes(prev => (prev ? `${prev}\n**Important concept**` : '**Important concept**'))}
+                      style={tagBtnStyle}
+                      title="Add Bold Text"
+                    >
+                      **Bold**
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   className="input"
-                  rows={2}
-                  placeholder="What went well? Any grammar rules or pronunciation tips?"
+                  rows={4}
+                  placeholder={`Write any detailed practice session description or formatted notes here...
+Examples:
+• Spoke about tech startups for 20 mins
+[Grammar] Used past perfect tense correctly
+[Pronunciation] Focused on 'th' sound in 'thorough'
+**Key Takeaway** Practice daily to build automaticity.`}
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
-                  style={{ resize: 'vertical' }}
+                  style={{ resize: 'vertical', lineHeight: 1.5 }}
                 />
               </div>
 
@@ -540,4 +587,10 @@ export default function EnglishPracticePage() {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6,
+};
+
+const tagBtnStyle: React.CSSProperties = {
+  fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+  background: 'var(--bg-card-hover)', border: '1px solid var(--border)',
+  color: 'var(--text-secondary)', cursor: 'pointer',
 };
