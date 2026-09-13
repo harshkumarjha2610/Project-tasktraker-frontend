@@ -1,21 +1,29 @@
 'use client';
 
-import React from 'react';
-import { BookOpen, Sparkles, AlertCircle, CheckCircle2, MessageSquare, Quote } from 'lucide-react';
+import React, { useState } from 'react';
+import { BookOpen, Quote, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface FormattedPracticeNotesProps {
   notes?: string;
   className?: string;
+  defaultExpanded?: boolean;
 }
 
 /**
  * FormattedPracticeNotes - Renders practice notes with markdown-like rich formatting,
- * custom bullet lists, headings, tag callouts, and bold text highlighting directly on cards.
+ * custom bullet lists, headings, tag callouts, and bold text highlighting.
+ * Defaults to a short 3-4 line preview with a "Read more" / "Show less" expand toggle.
  */
-export default function FormattedPracticeNotes({ notes, className }: FormattedPracticeNotesProps) {
+export default function FormattedPracticeNotes({ notes, className, defaultExpanded = false }: FormattedPracticeNotesProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
   if (!notes || !notes.trim()) return null;
 
   const lines = notes.split('\n');
+  const nonEmptyLines = lines.filter(l => l.trim().length > 0);
+
+  // Check if content exceeds 3-4 lines or ~180 chars
+  const isLongContent = nonEmptyLines.length > 3 || notes.length > 180;
 
   // Helper to parse bold text **bold** and tags [Tag]
   const renderInlineFormatting = (text: string) => {
@@ -91,33 +99,65 @@ export default function FormattedPracticeNotes({ notes, className }: FormattedPr
         background: 'rgba(255, 255, 255, 0.03)',
         border: '1px solid var(--border)',
         borderRadius: 12,
-        padding: '14px 16px',
-        marginTop: 12,
+        padding: '12px 16px',
+        marginTop: 10,
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
+        position: 'relative',
       }}
     >
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
+          justifyContent: 'space-between',
           fontSize: 11,
           fontWeight: 700,
           color: '#8b5cf6',
           textTransform: 'uppercase',
           letterSpacing: '0.06em',
-          marginBottom: 4,
           paddingBottom: 6,
           borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
         }}
       >
-        <BookOpen size={13} color="#8b5cf6" />
-        Practice Notes & Detailed Learnings
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <BookOpen size={13} color="#8b5cf6" />
+          Practice Notes
+        </span>
+        {isLongContent && (
+          <button
+            onClick={() => setIsExpanded(prev => !prev)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#8b5cf6',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: 0,
+            }}
+          >
+            {isExpanded ? 'Show less' : 'Read more'}
+            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+        )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          maxHeight: isLongContent && !isExpanded ? '6.2em' : 'none',
+          overflow: 'hidden',
+          position: 'relative',
+          transition: 'max-height 0.3s ease-in-out',
+        }}
+      >
         {lines.map((line, idx) => {
           const trimmed = line.trim();
           if (!trimmed) return <div key={idx} style={{ height: 4 }} />;
@@ -133,7 +173,7 @@ export default function FormattedPracticeNotes({ notes, className }: FormattedPr
                   fontSize: level === 1 ? 14 : 13,
                   fontWeight: 700,
                   color: 'var(--text-primary)',
-                  marginTop: idx > 0 ? 6 : 0,
+                  marginTop: idx > 0 ? 4 : 0,
                   marginBottom: 2,
                   display: 'flex',
                   alignItems: 'center',
@@ -225,7 +265,7 @@ export default function FormattedPracticeNotes({ notes, className }: FormattedPr
               <div
                 key={idx}
                 style={{
-                  padding: '8px 12px',
+                  padding: '6px 10px',
                   borderRadius: 8,
                   background: 'rgba(139,92,246,0.08)',
                   borderLeft: '3px solid #8b5cf6',
@@ -237,7 +277,7 @@ export default function FormattedPracticeNotes({ notes, className }: FormattedPr
                   gap: 8,
                 }}
               >
-                <Quote size={14} color="#8b5cf6" style={{ flexShrink: 0, marginTop: 2 }} />
+                <Quote size={13} color="#8b5cf6" style={{ flexShrink: 0, marginTop: 2 }} />
                 <div>{renderInlineFormatting(content)}</div>
               </div>
             );
@@ -258,7 +298,52 @@ export default function FormattedPracticeNotes({ notes, className }: FormattedPr
             </p>
           );
         })}
+
+        {/* Gradient fade overlay when collapsed */}
+        {isLongContent && !isExpanded && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 28,
+              background: 'linear-gradient(to bottom, transparent, rgba(20, 20, 30, 0.95))',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
       </div>
+
+      {/* Bottom Read More button bar */}
+      {isLongContent && (
+        <button
+          onClick={() => setIsExpanded(prev => !prev)}
+          style={{
+            marginTop: 4,
+            padding: '4px 10px',
+            borderRadius: 6,
+            background: 'rgba(139,92,246,0.12)',
+            border: '1px solid rgba(139,92,246,0.3)',
+            color: '#8b5cf6',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            width: 'fit-content',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {isExpanded ? (
+            <>Show less <ChevronUp size={14} /></>
+          ) : (
+            <>Read more <ChevronDown size={14} /></>
+          )}
+        </button>
+      )}
     </div>
   );
 }
