@@ -278,14 +278,14 @@ export default function PomodoroPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                background: settings.soundEnabled && settings.bellEnabled ? 'rgba(6,186,212,0.15)' : undefined,
-                borderColor: settings.soundEnabled && settings.bellEnabled ? 'rgba(6,186,212,0.4)' : undefined,
-                color: settings.soundEnabled && settings.bellEnabled ? '#06b6d4' : 'var(--text-secondary)'
+                background: settings.bellEnabled ? 'rgba(6,186,212,0.15)' : undefined,
+                borderColor: settings.bellEnabled ? 'rgba(6,186,212,0.4)' : undefined,
+                color: settings.bellEnabled ? '#06b6d4' : 'var(--text-secondary)'
               }}
               title={settings.bellEnabled ? 'Disable Transition Bell' : 'Enable Transition Bell'}
             >
               <BellRing size={17} />
-              <span style={{ fontSize: 13 }}>{settings.soundEnabled && settings.bellEnabled ? 'Zen Bell On' : 'Bell Off'}</span>
+              <span style={{ fontSize: 13 }}>{settings.bellEnabled ? 'Zen Bell On' : 'Bell Off'}</span>
             </button>
 
             <button

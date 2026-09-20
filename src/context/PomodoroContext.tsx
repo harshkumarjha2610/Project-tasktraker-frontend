@@ -764,7 +764,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
     setHasSessionStarted(false);
 
-    if (settings.soundEnabled && settings.bellEnabled) {
+    if (settings.bellEnabled) {
       const bellType = mode === 'work' ? 'focus_to_break' : 'break_to_focus';
       playTransitionBell(bellType);
     } else if (settings.soundEnabled) {
