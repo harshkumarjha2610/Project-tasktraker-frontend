@@ -5,9 +5,10 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CheckSquare, BarChart3, Tag, Settings,
   Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen, Gamepad2, StickyNote, Hourglass, Timer,
-  Languages, UserPlus, Briefcase
+  Languages, UserPlus, Briefcase, Flame
 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
+import { useStreakContext } from '@/context/StreakContext';
 
 const NAV_ITEMS = [
   { href: '/',                  icon: LayoutDashboard, label: 'Dashboard' },
@@ -33,6 +34,7 @@ interface SidebarProps {
 export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { streakData } = useStreakContext();
   const isDark = theme === 'dark';
 
   return (
@@ -59,7 +61,16 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }: 
 
           {/* Text — hidden when collapsed */}
           <div className="sidebar-logo-text" style={{ overflow: 'hidden', minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>DailyTask</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>DailyTask</span>
+              <span style={{
+                fontSize: 10, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.18)',
+                padding: '1px 6px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.3)',
+                display: 'flex', alignItems: 'center', gap: 2
+              }}>
+                <Flame size={11} fill="#f59e0b" color="#f59e0b" /> {streakData.currentStreak}d
+              </span>
+            </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Productivity Suite</div>
           </div>
         </div>

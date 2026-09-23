@@ -6,7 +6,27 @@ import FloatingPomodoroWidget from '@/components/FloatingPomodoroWidget';
 import { TaskProvider } from '@/context/TaskContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { PomodoroProvider } from '@/context/PomodoroContext';
-import { Menu, Sun, Moon, Zap, Gamepad2 } from 'lucide-react';
+import { StreakProvider, useStreakContext } from '@/context/StreakContext';
+import DynamicAgeWidget from '@/components/DynamicAgeWidget';
+import { Menu, Sun, Moon, Zap, Gamepad2, Flame } from 'lucide-react';
+
+function StreakHeaderBadge() {
+  const { streakData } = useStreakContext();
+  return (
+    <div
+      title={`Current Daily Streak: ${streakData.currentStreak} day(s)`}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        padding: '6px 12px', borderRadius: 9,
+        background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)',
+        color: '#f59e0b', fontSize: 13, fontWeight: 700,
+      }}
+    >
+      <Flame size={15} color="#f59e0b" fill="#f59e0b" />
+      <span>{streakData.currentStreak}d</span>
+    </div>
+  );
+}
 
 function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
@@ -88,11 +108,40 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>DailyTask</span>
           </div>
         </div>
-        <ThemeToggle />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <DynamicAgeWidget />
+          <StreakHeaderBadge />
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Main content — margin adapts to sidebar width */}
       <main className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        {/* Top Header Bar for Desktop */}
+        <div className="desktop-header-bar" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 16px', background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)', borderRadius: 14, marginBottom: 20,
+          flexWrap: 'wrap', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 8,
+              background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Zap size={14} color="#fff" fill="#fff" />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>DailyTask Suite</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <DynamicAgeWidget />
+            <StreakHeaderBadge />
+            <ThemeToggle />
+          </div>
+        </div>
+
         {children}
       </main>
 
@@ -105,11 +154,13 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
-      <TaskProvider>
-        <PomodoroProvider>
-          <InnerLayout>{children}</InnerLayout>
-        </PomodoroProvider>
-      </TaskProvider>
+      <StreakProvider>
+        <TaskProvider>
+          <PomodoroProvider>
+            <InnerLayout>{children}</InnerLayout>
+          </PomodoroProvider>
+        </TaskProvider>
+      </StreakProvider>
     </ThemeProvider>
   );
 }

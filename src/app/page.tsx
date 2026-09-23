@@ -2,6 +2,7 @@
 
 import { useTaskContext } from '@/context/TaskContext';
 import { usePomodoroContext } from '@/context/PomodoroContext';
+import { useStreakContext } from '@/context/StreakContext';
 import { getNotes, getEnglishPracticeLogs, getJobs, getClientApproaches } from '@/lib/api';
 import { Note } from '@/types/note';
 import { Task, Priority, Category } from '@/types/task';
@@ -50,6 +51,7 @@ function formatBytes(bytes: number, decimals = 1): string {
 export default function DashboardPage() {
   const { tasks, addTask, editTask, removeTask, toggleComplete, loading: tasksLoading, error: tasksError } = useTaskContext();
   const { history: pomodoroHistory, wasteHistory, totalWastedSecondsToday, completedSessionsCount, formatSecsToHoursMins } = usePomodoroContext();
+  const { streakData, weeklyActivity, milestones, hasVisitedToday } = useStreakContext();
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [englishLogs, setEnglishLogs] = useState<EnglishPracticeLog[]>([]);
@@ -104,8 +106,10 @@ export default function DashboardPage() {
     return { total, done, inProgress, todo, overdue, completionRate, totalEstMins, totalActualMins, byCategory, byPriority };
   }, [tasks]);
 
-  // ─── 2. Pomodoro Metrics ─────────────────────────────────────────
+  // ─── 2. Pomodoro & Productive Day Metrics ─────────────────────────
   const pomodoroStats = useMemo(() => {
+    const PRODUCTIVE_DAY_TARGET_MINS = 600; // 10 pomodoros of 60 mins = 600 mins (10 hours)
+
     const totalWorkSessions = pomodoroHistory.filter(s => s.mode === 'work').length;
     const totalFocusMinutes = pomodoroHistory
       .filter(s => s.mode === 'work')
@@ -120,7 +124,48 @@ export default function DashboardPage() {
       .filter(s => s.mode !== 'work')
       .reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
 
-    return { totalWorkSessions, totalFocusMinutes, todayFocusMinutes, totalBreakMinutes };
+    // Group work focus minutes by date (YYYY-MM-DD)
+    const dailyFocusMap: Record<string, number> = {};
+    pomodoroHistory.forEach(s => {
+      if (s.mode === 'work' && s.completedAt) {
+        const dStr = format(new Date(s.completedAt), 'yyyy-MM-dd');
+        dailyFocusMap[dStr] = (dailyFocusMap[dStr] || 0) + (s.durationMinutes || 0);
+      }
+    });
+
+    let totalProductiveDays = 0;
+    let totalNonProductiveDays = 0;
+    const dateEntries = Object.entries(dailyFocusMap);
+
+    dateEntries.forEach(([, mins]) => {
+      if (mins >= PRODUCTIVE_DAY_TARGET_MINS) {
+        totalProductiveDays++;
+      } else {
+        totalNonProductiveDays++;
+      }
+    });
+
+    const isTodayProductive = todayFocusMinutes >= PRODUCTIVE_DAY_TARGET_MINS;
+    const todayProgressPct = Math.min(100, Math.round((todayFocusMinutes / PRODUCTIVE_DAY_TARGET_MINS) * 100));
+    const minsRemainingToday = Math.max(0, PRODUCTIVE_DAY_TARGET_MINS - todayFocusMinutes);
+    const todayPomodoroCount60m = (todayFocusMinutes / 60).toFixed(1);
+    const totalDaysTracked = dateEntries.length;
+    const productivityRate = totalDaysTracked > 0 ? Math.round((totalProductiveDays / totalDaysTracked) * 100) : 0;
+
+    return {
+      totalWorkSessions,
+      totalFocusMinutes,
+      todayFocusMinutes,
+      totalBreakMinutes,
+      PRODUCTIVE_DAY_TARGET_MINS,
+      isTodayProductive,
+      todayProgressPct,
+      minsRemainingToday,
+      todayPomodoroCount60m,
+      totalProductiveDays,
+      totalNonProductiveDays,
+      productivityRate,
+    };
   }, [pomodoroHistory]);
 
   // ─── 3. Notes Metrics ────────────────────────────────────────────
@@ -349,6 +394,25 @@ export default function DashboardPage() {
         gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
         gap: 16,
       }}>
+        {/* KPI 0: App Daily Streak */}
+        <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(234,88,12,0.05))', border: '1px solid rgba(245,158,11,0.3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(245,158,11,0.2)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Flame size={22} color="#f59e0b" fill="#f59e0b" />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.18)', padding: '3px 8px', borderRadius: 6 }}>
+              {hasVisitedToday ? 'Active Today 🔥' : 'Open Daily'}
+            </span>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>
+            {streakData.currentStreak} <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)' }}>{streakData.currentStreak === 1 ? 'day streak' : 'days streak'}</span>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>App Daily Streak</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            Best: {streakData.longestStreak} days • {streakData.totalDaysActive} total active days
+          </div>
+        </div>
+
         {/* KPI 1: Tasks Completion Rate */}
         <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(139,92,246,0.03))', border: '1px solid rgba(139,92,246,0.25)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -443,10 +507,318 @@ export default function DashboardPage() {
             {pomodoroStats.totalWorkSessions} completed sessions
           </div>
         </div>
+
+        {/* KPI 6: Daily Productive Status (10 Pomodoros x 60m = 600m Target) */}
+        <div className="stat-card" style={{
+          background: pomodoroStats.isTodayProductive
+            ? 'linear-gradient(135deg, rgba(16,185,129,0.18), rgba(245,158,11,0.06))'
+            : 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(139,92,246,0.03))',
+          border: `1px solid ${pomodoroStats.isTodayProductive ? 'rgba(16,185,129,0.4)' : 'rgba(139,92,246,0.25)'}`
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: pomodoroStats.isTodayProductive ? 'rgba(16,185,129,0.22)' : 'rgba(139,92,246,0.18)',
+              color: pomodoroStats.isTodayProductive ? '#10b981' : '#8b5cf6',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Award size={22} />
+            </div>
+            <span style={{
+              fontSize: 12, fontWeight: 700,
+              color: pomodoroStats.isTodayProductive ? '#10b981' : '#f59e0b',
+              background: pomodoroStats.isTodayProductive ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+              padding: '3px 8px', borderRadius: 6
+            }}>
+              {pomodoroStats.isTodayProductive ? '🌟 Productive Day' : '⚡ Non-Productive'}
+            </span>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>
+            {pomodoroStats.todayFocusMinutes} <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>/ 600 mins</span>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Daily Productive Status</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            {pomodoroStats.todayPomodoroCount60m} / 10 Pomodoros (60m) • {pomodoroStats.totalProductiveDays} productive days
+          </div>
+        </div>
       </div>
 
       {/* ── DETAILED ANALYTICS SECTIONS ───────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))', gap: 20 }}>
+        
+        {/* ── ANALYTICS CARD: Daily Productive Day Tracker (10 Pomodoros x 60m = 600m Goal) ── */}
+        <div style={{
+          padding: '22px 24px',
+          borderRadius: 20,
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+          gridColumn: '1 / -1',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 42, height: 42, borderRadius: 12,
+                background: pomodoroStats.isTodayProductive
+                  ? 'linear-gradient(135deg, rgba(16,185,129,0.25), rgba(245,158,11,0.15))'
+                  : 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(6,186,212,0.1))',
+                color: pomodoroStats.isTodayProductive ? '#10b981' : '#8b5cf6',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Award size={24} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>Daily Productive Day Tracker</h3>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700,
+                    color: pomodoroStats.isTodayProductive ? '#10b981' : '#f59e0b',
+                    background: pomodoroStats.isTodayProductive ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                    padding: '2px 8px', borderRadius: 12, border: `1px solid ${pomodoroStats.isTodayProductive ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`
+                  }}>
+                    {pomodoroStats.isTodayProductive ? '🌟 Productive Day Achieved!' : '⚡ Non-Productive Day'}
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Rule: 10 Pomodoros of 60 minutes (600 minutes / 10 hours focus) required per day</span>
+              </div>
+            </div>
+            <Link href="/pomodoro" className="btn btn-secondary btn-sm" style={{ gap: 6 }}>
+              <Clock size={14} /> Open Pomodoro Timer <ArrowUpRight size={14} />
+            </Link>
+          </div>
+
+          {/* Today's Goal Progress Bar */}
+          <div style={{ padding: '16px 18px', borderRadius: 16, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Today's Focus Goal Progress</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+                  ({pomodoroStats.todayFocusMinutes} / 600 mins)
+                </span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 800, color: pomodoroStats.isTodayProductive ? '#10b981' : '#8b5cf6' }}>
+                {pomodoroStats.todayProgressPct}% ({pomodoroStats.todayPomodoroCount60m} / 10 Pomodoros)
+              </span>
+            </div>
+
+            {/* Progress Track */}
+            <div style={{ width: '100%', height: 12, borderRadius: 6, background: 'var(--bg-secondary)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+              <div style={{
+                width: `${pomodoroStats.todayProgressPct}%`,
+                height: '100%',
+                background: pomodoroStats.isTodayProductive
+                  ? 'linear-gradient(90deg, #10b981, #f59e0b)'
+                  : 'linear-gradient(90deg, #8b5cf6, #06b6d4)',
+                borderRadius: 6,
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {pomodoroStats.isTodayProductive
+                  ? '🎉 Outstanding achievement! You reached 10 hours (600 mins) of focus time today!'
+                  : `⚡ Need ${pomodoroStats.minsRemainingToday} more minutes (${(pomodoroStats.minsRemainingToday / 60).toFixed(1)} hrs) today to qualify as a Productive Day.`}
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Target: 600m</span>
+            </div>
+          </div>
+
+          {/* Productive vs Non-Productive Days Breakdown */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
+            <div style={{ padding: '16px 18px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(16,185,129,0.02))', border: '1px solid rgba(16,185,129,0.25)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981', letterSpacing: '0.05em' }}>PRODUCTIVE DAYS</span>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#10b981', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                🌟 {pomodoroStats.totalProductiveDays} {pomodoroStats.totalProductiveDays === 1 ? 'Day' : 'Days'}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Days with ≥ 10 Pomodoros (600 mins)</span>
+            </div>
+
+            <div style={{ padding: '16px 18px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.02))', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', letterSpacing: '0.05em' }}>NON-PRODUCTIVE DAYS</span>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#ef4444', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                ⚡ {pomodoroStats.totalNonProductiveDays} {pomodoroStats.totalNonProductiveDays === 1 ? 'Day' : 'Days'}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Days with &lt; 10 Pomodoros (600 mins)</span>
+            </div>
+
+            <div style={{ padding: '16px 18px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>PRODUCTIVITY RATE</span>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#8b5cf6', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                📈 {pomodoroStats.productivityRate}%
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Ratio of productive active days</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* ── ANALYTICS CARD 0: App Daily Streak & Habit Tracker ── */}
+        <div style={{
+          padding: '22px 24px',
+          borderRadius: 20,
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+          gridColumn: '1 / -1',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'linear-gradient(135deg, rgba(245,158,11,0.25), rgba(234,88,12,0.15))', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Flame size={24} color="#f59e0b" fill="#f59e0b" />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>App Daily Streak & Habit Consistency</h3>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.15)', padding: '2px 8px', borderRadius: 12, border: '1px solid rgba(245,158,11,0.3)' }}>
+                    🔥 Live Tracker
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Automatically counts every day you visit DailyTask!</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: hasVisitedToday ? '#10b981' : '#f59e0b', background: hasVisitedToday ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)', padding: '5px 10px', borderRadius: 8, border: `1px solid ${hasVisitedToday ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+                {hasVisitedToday ? '✓ Checked in Today!' : '🔥 Keep the flame burning!'}
+              </span>
+            </div>
+          </div>
+
+          {/* Core Metrics Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
+            <div style={{ padding: '16px 18px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.02))', border: '1px solid rgba(245,158,11,0.25)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>CURRENT STREAK</span>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#f59e0b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Flame size={20} fill="#f59e0b" />
+                {streakData.currentStreak} {streakData.currentStreak === 1 ? 'Day' : 'Days'}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Consecutive active days</span>
+            </div>
+
+            <div style={{ padding: '16px 18px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>LONGEST RECORD</span>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#8b5cf6', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                🏆 {streakData.longestStreak} {streakData.longestStreak === 1 ? 'Day' : 'Days'}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>All-time best record</span>
+            </div>
+
+            <div style={{ padding: '16px 18px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em' }}>TOTAL DAYS ACTIVE</span>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#06b6d4', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                📅 {streakData.totalDaysActive} {streakData.totalDaysActive === 1 ? 'Day' : 'Days'}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>Lifetime check-ins logged</span>
+            </div>
+          </div>
+
+          {/* 7-Day Visual Weekly Activity Tracker */}
+          <div style={{ padding: '16px 18px', borderRadius: 16, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>This Week's Activity (Mon - Sun)</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Opens logged automatically</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+              {weeklyActivity.map((day, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '12px 6px',
+                    borderRadius: 12,
+                    textAlign: 'center',
+                    background: day.isActive
+                      ? 'linear-gradient(135deg, rgba(245,158,11,0.22), rgba(234,88,12,0.15))'
+                      : day.isToday
+                      ? 'rgba(139,92,246,0.1)'
+                      : 'var(--bg-secondary)',
+                    border: day.isToday
+                      ? '2px solid #f59e0b'
+                      : day.isActive
+                      ? '1px solid rgba(245,158,11,0.4)'
+                      : '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 6,
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <span style={{ fontSize: 11, fontWeight: 700, color: day.isToday ? '#f59e0b' : 'var(--text-muted)' }}>
+                    {day.dayName}
+                  </span>
+
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: day.isActive
+                      ? '#f59e0b'
+                      : day.isFuture
+                      ? 'transparent'
+                      : 'var(--border)',
+                    color: day.isActive ? '#fff' : 'var(--text-muted)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 14, fontWeight: 800,
+                  }}>
+                    {day.isActive ? (
+                      <Flame size={16} fill="#fff" color="#fff" />
+                    ) : day.isToday ? (
+                      '⚡'
+                    ) : day.isFuture ? (
+                      '•'
+                    ) : (
+                      '✕'
+                    )}
+                  </div>
+
+                  <span style={{ fontSize: 10, fontWeight: 600, color: day.isActive ? '#f59e0b' : 'var(--text-muted)' }}>
+                    {day.isActive ? 'Logged' : day.isToday ? 'Today' : day.isFuture ? 'Upcoming' : 'Missed'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Milestone Badges Row */}
+          <div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: 10 }}>
+              Streak Milestone Badges
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: 10 }}>
+              {milestones.map((m, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    background: m.unlocked
+                      ? 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(139,92,246,0.05))'
+                      : 'var(--bg-card)',
+                    border: m.unlocked
+                      ? '1px solid rgba(245,158,11,0.35)'
+                      : '1px solid var(--border)',
+                    opacity: m.unlocked ? 1 : 0.55,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}>{m.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: m.unlocked ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                      {m.title}
+                    </div>
+                    <div style={{ fontSize: 10, color: m.unlocked ? '#f59e0b' : 'var(--text-muted)', fontWeight: 600 }}>
+                      {m.requiredDays} {m.requiredDays === 1 ? 'day' : 'days'} {m.unlocked ? '✓ Unlocked' : 'Locked'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
         
         {/* ── ANALYTICS CARD 1: English Practice Analytics & Formatted Notes ── */}
         <div style={{

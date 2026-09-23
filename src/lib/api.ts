@@ -1,5 +1,6 @@
 import { Task, DetailedStats } from '@/types/task';
 import { Note } from '@/types/note';
+import { StreakData } from '@/types/streak';
 
 // ─── Base URL ──────────────────────────────────────────────────
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 
@@ -511,6 +512,91 @@ export async function deleteJob(id: string): Promise<void> {
     }
   }
 }
+
+// ─── Daily Streak API ──────────────────────────────────────────
+export async function getStreakData(): Promise<StreakData> {
+  try {
+    const res = await request<{ data: StreakData }>('/streak');
+    return res.data;
+  } catch (err) {
+    console.warn('[API] Streak backend offline, loading from localStorage fallback');
+    const local = localStorage.getItem('dt_app_daily_streak');
+    if (local) return JSON.parse(local);
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
+      lastActiveDate: '',
+      activeDates: [],
+      totalDaysActive: 0,
+    };
+  }
+}
+
+export async function recordStreakVisit(dateStr: string): Promise<StreakData> {
+  try {
+    const res = await request<{ data: StreakData }>('/streak/record-visit', {
+      method: 'POST',
+      body: JSON.stringify({ dateStr }),
+    });
+    return res.data;
+  } catch (err) {
+    console.warn('[API] Streak backend error, recording locally');
+    const local = localStorage.getItem('dt_app_daily_streak');
+    let data: StreakData = local
+      ? JSON.parse(local)
+      : { currentStreak: 0, longestStreak: 0, lastActiveDate: '', activeDates: [], totalDaysActive: 0 };
+
+    if (data.lastActiveDate === dateStr) {
+      return data;
+    }
+
+    const getDaysDiff = (d1: string, d2: string) => {
+      if (!d1 || !d2) return Infinity;
+      const t1 = new Date(d1 + 'T00:00:00').getTime();
+      const t2 = new Date(d2 + 'T00:00:00').getTime();
+      return Math.round((t2 - t1) / (1000 * 3600 * 24));
+    };
+
+    const diff = getDaysDiff(data.lastActiveDate, dateStr);
+    if (!data.lastActiveDate || diff > 1 || diff < 0) {
+      data.currentStreak = 1;
+    } else if (diff === 1) {
+      data.currentStreak += 1;
+    }
+
+    if (data.currentStreak > data.longestStreak) {
+      data.longestStreak = data.currentStreak;
+    }
+
+    data.lastActiveDate = dateStr;
+    if (!data.activeDates.includes(dateStr)) {
+      data.activeDates.push(dateStr);
+      data.totalDaysActive = data.activeDates.length;
+    }
+
+    localStorage.setItem('dt_app_daily_streak', JSON.stringify(data));
+    return data;
+  }
+}
+
+export async function syncStreakData(payload: Partial<StreakData>): Promise<StreakData> {
+  try {
+    const res = await request<{ data: StreakData }>('/streak/sync', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return res.data;
+  } catch (err) {
+    const local = localStorage.getItem('dt_app_daily_streak');
+    const current: StreakData = local
+      ? JSON.parse(local)
+      : { currentStreak: 0, longestStreak: 0, lastActiveDate: '', activeDates: [], totalDaysActive: 0 };
+    const updated = { ...current, ...payload };
+    localStorage.setItem('dt_app_daily_streak', JSON.stringify(updated));
+    return updated;
+  }
+}
+
 
 
 

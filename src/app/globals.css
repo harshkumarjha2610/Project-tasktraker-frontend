@@ -742,6 +742,10 @@ body {
   .stat-card {
     padding: 16px;
   }
+
+  .desktop-header-bar {
+    display: none !important;
+  }
 }
 
 @media (max-width: 480px) {
