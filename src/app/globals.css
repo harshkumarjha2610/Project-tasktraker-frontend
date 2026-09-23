@@ -104,6 +104,36 @@ body {
   border-radius: 3px;
 }
 
+/* ─── Notes Smooth Scroll & Enhanced Scrollbars ───────────────── */
+html, body, .notes-page-container, .note-editor-container, .note-modal-container, .modal-box, .ProseMirror, .note-card-body, [data-smooth-scroll="true"] {
+  scroll-behavior: smooth !important;
+}
+
+.note-editor-container::-webkit-scrollbar,
+.note-modal-container::-webkit-scrollbar,
+.notes-filter-bar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.note-editor-container::-webkit-scrollbar-track,
+.note-modal-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.note-editor-container::-webkit-scrollbar-thumb,
+.note-modal-container::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.note-editor-container::-webkit-scrollbar-thumb:hover,
+.note-modal-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.7);
+}
+
 /* ─── Cards ──────────────────────────────────────────────────── */
 .glass {
   background: var(--bg-card);

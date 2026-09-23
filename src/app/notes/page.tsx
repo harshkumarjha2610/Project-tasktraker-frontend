@@ -102,7 +102,7 @@ export default function NotesPage() {
   });
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div className="notes-page-container" style={{ maxWidth: 1200, margin: '0 auto', scrollBehavior: 'smooth' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -166,7 +166,7 @@ export default function NotesPage() {
           </div>
 
           {/* Filter Pills */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+          <div className="notes-filter-bar" style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto', scrollBehavior: 'smooth', paddingBottom: 4, WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             {COLOR_FILTERS.map((f) => {
               const isActive = selectedColor === f.id;
               return (

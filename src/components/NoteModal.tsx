@@ -1237,6 +1237,9 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
               .note-modal-header {
                 padding: 10px 14px !important;
               }
+              .note-editor-container, .note-modal-container, .ProseMirror, .tiptap-editor {
+                scroll-behavior: smooth !important;
+              }
               .note-colors-bar {
                 max-width: 130px;
               }
@@ -1257,13 +1260,14 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
               position: 'relative',
               padding: color === 'white' ? '24px 32px 32px 32px' : '4px 32px 32px 92px', 
               overflowY: 'auto',
+              scrollBehavior: 'smooth',
               backgroundImage: desktopBgImage,
               backgroundPosition: '0 0',
               backgroundAttachment: 'local',
             }}
           >
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-              <EditorContent editor={editor} style={{ flex: 1, display: 'flex', flexDirection: 'column' }} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100%', scrollBehavior: 'smooth' }}>
+              <EditorContent editor={editor} style={{ flex: 1, display: 'flex', flexDirection: 'column', scrollBehavior: 'smooth' }} />
             </div>
           </div>
         </form>
