@@ -5,16 +5,16 @@ import {
   Wallet, DollarSign, TrendingUp, TrendingDown, Clock, UserCheck,
   Plus, Search, Filter, Trash2, Check, CheckCircle2, ArrowUpRight,
   PieChart as PieChartIcon, BarChart3, Calendar, Layers, ShieldCheck,
-  AlertCircle, ChevronRight, X, User, ArrowDownRight
+  AlertCircle, ChevronRight, X, User, ArrowDownRight, Pencil, Sliders
 } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import {
   FinanceTransaction, CommittedIncomeRecord, MoneyLentRecord, FinanceSummary
 } from '@/types/finance';
 import {
-  getFinanceTransactions, createFinanceTransaction, deleteFinanceTransaction,
-  getCommittedIncomes, createCommittedIncome, deleteCommittedIncome, markCommittedIncomeReceived,
-  getMoneyLentRecords, createMoneyLentRecord, deleteMoneyLentRecord, recordLendRepayment,
+  getFinanceTransactions, createFinanceTransaction, updateFinanceTransaction, deleteFinanceTransaction,
+  getCommittedIncomes, createCommittedIncome, updateCommittedIncome, deleteCommittedIncome, markCommittedIncomeReceived,
+  getMoneyLentRecords, createMoneyLentRecord, updateMoneyLentRecord, deleteMoneyLentRecord, recordLendRepayment,
   getFinanceSummary
 } from '@/lib/api';
 import {
@@ -22,8 +22,8 @@ import {
 } from 'recharts';
 
 const TRANSACTION_CATEGORIES = {
-  income: ['Salary', 'Freelance', 'Client Work', 'Investments', 'Gift', 'Other Income'],
-  expense: ['Food & Dining', 'Tools & Software', 'Rent & Utilities', 'Shopping', 'Travel', 'Health & Fitness', 'Entertainment', 'Personal', 'Other Expense'],
+  income: ['Salary', 'Freelance', 'Client Work', 'Investments', 'Gift', 'Initial / Balance Adjustment', 'Other Income'],
+  expense: ['Food & Dining', 'Tools & Software', 'Rent & Utilities', 'Shopping', 'Travel', 'Health & Fitness', 'Entertainment', 'Personal', 'Initial / Balance Adjustment', 'Other Expense'],
 };
 
 const PAYMENT_METHODS = [
@@ -52,6 +52,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Health & Fitness': '#10b981',
   'Entertainment': '#f59e0b',
   'Personal': '#6b7280',
+  'Initial / Balance Adjustment': '#6366f1',
   'Other Expense': '#94a3b8',
 };
 
@@ -68,10 +69,19 @@ export default function FinanceTrackerPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [txTypeFilter, setTxTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
 
-  // Modal States
+  // Modal & Edit States
   const [showTxModal, setShowTxModal] = useState(false);
+  const [editingTx, setEditingTx] = useState<FinanceTransaction | null>(null);
+
   const [showCommittedModal, setShowCommittedModal] = useState(false);
+  const [editingCommitted, setEditingCommitted] = useState<CommittedIncomeRecord | null>(null);
+
   const [showLentModal, setShowLentModal] = useState(false);
+  const [editingLent, setEditingLent] = useState<MoneyLentRecord | null>(null);
+
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [targetBalanceInput, setTargetBalanceInput] = useState('');
+
   const [repayModalItem, setRepayModalItem] = useState<MoneyLentRecord | null>(null);
   const [repayAmountInput, setRepayAmountInput] = useState('');
 
@@ -157,20 +167,53 @@ export default function FinanceTrackerPage() {
   }, [transactions, committedIncomes, moneyLentRecords]);
 
   // Handlers for Transactions
-  const handleCreateTransaction = async (e: React.FormEvent) => {
+  const openNewTxModal = () => {
+    setEditingTx(null);
+    setTxForm({
+      type: 'income',
+      amount: '',
+      category: 'Client Work',
+      date: format(new Date(), 'yyyy-MM-dd'),
+      description: '',
+      paymentMethod: 'bank_transfer',
+    });
+    setShowTxModal(true);
+  };
+
+  const handleEditTx = (tx: FinanceTransaction) => {
+    setEditingTx(tx);
+    setTxForm({
+      type: tx.type,
+      amount: String(tx.amount),
+      category: tx.category,
+      date: format(new Date(tx.date), 'yyyy-MM-dd'),
+      description: tx.description || '',
+      paymentMethod: tx.paymentMethod || 'bank_transfer',
+    });
+    setShowTxModal(true);
+  };
+
+  const handleSaveTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!txForm.amount || Number(txForm.amount) <= 0) return;
 
-    await createFinanceTransaction({
+    const payload = {
       type: txForm.type,
       amount: Number(txForm.amount),
       category: txForm.category,
       date: txForm.date ? new Date(txForm.date).toISOString() : new Date().toISOString(),
       description: txForm.description,
       paymentMethod: txForm.paymentMethod as FinanceTransaction['paymentMethod'],
-    });
+    };
+
+    if (editingTx) {
+      await updateFinanceTransaction(editingTx.id, payload);
+    } else {
+      await createFinanceTransaction(payload);
+    }
 
     setShowTxModal(false);
+    setEditingTx(null);
     setTxForm({
       type: 'income',
       amount: '',
@@ -188,21 +231,79 @@ export default function FinanceTrackerPage() {
     loadAllData();
   };
 
+  // Handlers for Manual Net Balance Adjustment
+  const openAdjustBalanceModal = () => {
+    setTargetBalanceInput(String(summary.netBalance));
+    setShowAdjustModal(true);
+  };
+
+  const handleAdjustBalanceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (targetBalanceInput === '') return;
+
+    const target = Number(targetBalanceInput);
+    const diff = target - summary.netBalance;
+
+    if (diff !== 0) {
+      await createFinanceTransaction({
+        type: diff > 0 ? 'income' : 'expense',
+        amount: Math.abs(diff),
+        category: 'Initial / Balance Adjustment',
+        date: new Date().toISOString(),
+        description: `Manual Net Balance adjustment to set Net Current Balance to ₹${target.toLocaleString()}`,
+        paymentMethod: 'other',
+      });
+      loadAllData();
+    }
+    setShowAdjustModal(false);
+  };
+
   // Handlers for Committed Client Income
-  const handleCreateCommitted = async (e: React.FormEvent) => {
+  const openNewCommittedModal = () => {
+    setEditingCommitted(null);
+    setCommittedForm({
+      clientName: '',
+      projectTitle: '',
+      amount: '',
+      dueDate: format(new Date(), 'yyyy-MM-dd'),
+      notes: '',
+    });
+    setShowCommittedModal(true);
+  };
+
+  const handleEditCommitted = (item: CommittedIncomeRecord) => {
+    setEditingCommitted(item);
+    setCommittedForm({
+      clientName: item.clientName,
+      projectTitle: item.projectTitle,
+      amount: String(item.amount),
+      dueDate: format(new Date(item.dueDate), 'yyyy-MM-dd'),
+      notes: item.notes || '',
+    });
+    setShowCommittedModal(true);
+  };
+
+  const handleSaveCommitted = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!committedForm.clientName || !committedForm.amount || Number(committedForm.amount) <= 0) return;
 
-    await createCommittedIncome({
+    const payload = {
       clientName: committedForm.clientName,
       projectTitle: committedForm.projectTitle || 'Project Milestone',
       amount: Number(committedForm.amount),
       dueDate: committedForm.dueDate ? new Date(committedForm.dueDate).toISOString() : new Date().toISOString(),
-      status: 'pending',
+      status: editingCommitted ? editingCommitted.status : 'pending',
       notes: committedForm.notes,
-    });
+    };
+
+    if (editingCommitted) {
+      await updateCommittedIncome(editingCommitted.id, payload);
+    } else {
+      await createCommittedIncome(payload);
+    }
 
     setShowCommittedModal(false);
+    setEditingCommitted(null);
     setCommittedForm({
       clientName: '',
       projectTitle: '',
@@ -226,21 +327,52 @@ export default function FinanceTrackerPage() {
   };
 
   // Handlers for Money Lent
-  const handleCreateLent = async (e: React.FormEvent) => {
+  const openNewLentModal = () => {
+    setEditingLent(null);
+    setLentForm({
+      borrowerName: '',
+      amount: '',
+      dateLent: format(new Date(), 'yyyy-MM-dd'),
+      expectedReturnDate: '',
+      notes: '',
+    });
+    setShowLentModal(true);
+  };
+
+  const handleEditLent = (item: MoneyLentRecord) => {
+    setEditingLent(item);
+    setLentForm({
+      borrowerName: item.borrowerName,
+      amount: String(item.amount),
+      dateLent: format(new Date(item.dateLent), 'yyyy-MM-dd'),
+      expectedReturnDate: item.expectedReturnDate ? format(new Date(item.expectedReturnDate), 'yyyy-MM-dd') : '',
+      notes: item.notes || '',
+    });
+    setShowLentModal(true);
+  };
+
+  const handleSaveLent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lentForm.borrowerName || !lentForm.amount || Number(lentForm.amount) <= 0) return;
 
-    await createMoneyLentRecord({
+    const payload = {
       borrowerName: lentForm.borrowerName,
       amount: Number(lentForm.amount),
       dateLent: lentForm.dateLent ? new Date(lentForm.dateLent).toISOString() : new Date().toISOString(),
       expectedReturnDate: lentForm.expectedReturnDate ? new Date(lentForm.expectedReturnDate).toISOString() : undefined,
-      repaidAmount: 0,
-      status: 'pending',
+      repaidAmount: editingLent ? editingLent.repaidAmount : 0,
+      status: editingLent ? editingLent.status : 'pending',
       notes: lentForm.notes,
-    });
+    };
+
+    if (editingLent) {
+      await updateMoneyLentRecord(editingLent.id, payload);
+    } else {
+      await createMoneyLentRecord(payload);
+    }
 
     setShowLentModal(false);
+    setEditingLent(null);
     setLentForm({
       borrowerName: '',
       amount: '',
@@ -334,13 +466,16 @@ export default function FinanceTrackerPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowCommittedModal(true)} style={{ gap: 6 }}>
+          <button className="btn btn-secondary btn-sm" onClick={openAdjustBalanceModal} style={{ gap: 6 }}>
+            <Sliders size={15} color="#10b981" /> Set Net Balance
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={openNewCommittedModal} style={{ gap: 6 }}>
             <Clock size={15} color="#8b5cf6" /> + Committed Income
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowLentModal(true)} style={{ gap: 6 }}>
+          <button className="btn btn-secondary btn-sm" onClick={openNewLentModal} style={{ gap: 6 }}>
             <UserCheck size={15} color="#06b6d4" /> + Log Money Lent
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowTxModal(true)} style={{ gap: 6 }}>
+          <button className="btn btn-primary btn-sm" onClick={openNewTxModal} style={{ gap: 6 }}>
             <Plus size={16} /> New Transaction
           </button>
         </div>
@@ -374,8 +509,20 @@ export default function FinanceTrackerPage() {
           <div style={{ fontSize: 24, fontWeight: 800, color: summary.netBalance >= 0 ? '#10b981' : '#ef4444' }}>
             ₹{summary.netBalance.toLocaleString()}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-            Total Income (₹{summary.totalIncome.toLocaleString()}) - Expenses (₹{summary.totalExpense.toLocaleString()})
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              Income (₹{summary.totalIncome.toLocaleString()}) - Expenses (₹{summary.totalExpense.toLocaleString()})
+            </span>
+            <button
+              onClick={openAdjustBalanceModal}
+              style={{
+                fontSize: 11, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.15)',
+                border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6, padding: '2px 7px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4
+              }}
+            >
+              <Sliders size={11} /> Set Balance
+            </button>
           </div>
         </div>
 
@@ -543,6 +690,15 @@ export default function FinanceTrackerPage() {
                     </span>
 
                     <button
+                      onClick={() => handleEditTx(tx)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: 6, color: 'var(--text-muted)' }}
+                      title="Edit transaction"
+                    >
+                      <Pencil size={15} />
+                    </button>
+
+                    <button
                       onClick={() => handleDeleteTx(tx.id)}
                       className="btn btn-secondary btn-sm"
                       style={{ padding: 6, color: '#ef4444' }}
@@ -633,6 +789,15 @@ export default function FinanceTrackerPage() {
                           <Check size={14} /> Mark as Received
                         </button>
                       )}
+                      <button
+                        onClick={() => handleEditCommitted(item)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '6px 10px' }}
+                        title="Edit record"
+                      >
+                        <Pencil size={14} />
+                      </button>
+
                       <button
                         onClick={() => handleDeleteCommitted(item.id)}
                         className="btn btn-secondary btn-sm"
@@ -734,6 +899,15 @@ export default function FinanceTrackerPage() {
                         </button>
                       )}
                       <button
+                        onClick={() => handleEditLent(item)}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '6px 10px' }}
+                        title="Edit record"
+                      >
+                        <Pencil size={14} />
+                      </button>
+
+                      <button
                         onClick={() => handleDeleteLent(item.id)}
                         className="btn btn-secondary btn-sm"
                         style={{ padding: '6px 10px', color: '#ef4444' }}
@@ -800,18 +974,20 @@ export default function FinanceTrackerPage() {
         </div>
       )}
 
-      {/* ── MODAL 1: ADD TRANSACTION ────────────────────────────── */}
+      {/* ── MODAL 1: ADD / EDIT TRANSACTION ────────────────────── */}
       {showTxModal && (
         <div className="modal-backdrop" onClick={() => setShowTxModal(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>New Transaction</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {editingTx ? '✏️ Edit Payment Transaction' : '➕ Record New Transaction'}
+              </h3>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowTxModal(false)} style={{ padding: 6 }}>
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateTransaction} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={handleSaveTransaction} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Type Switcher */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <button
@@ -906,25 +1082,29 @@ export default function FinanceTrackerPage() {
 
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
                 <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowTxModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Transaction</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                  {editingTx ? 'Update Transaction' : 'Save Transaction'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ── MODAL 2: ADD COMMITTED CLIENT INCOME ───────────────── */}
+      {/* ── MODAL 2: ADD / EDIT COMMITTED CLIENT INCOME ────────── */}
       {showCommittedModal && (
         <div className="modal-backdrop" onClick={() => setShowCommittedModal(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>New Committed Client Income</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {editingCommitted ? '✏️ Edit Committed Client Income' : '💼 New Committed Client Income'}
+              </h3>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowCommittedModal(false)} style={{ padding: 6 }}>
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCommitted} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={handleSaveCommitted} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Client / Company Name</label>
                 <input
@@ -995,18 +1175,20 @@ export default function FinanceTrackerPage() {
         </div>
       )}
 
-      {/* ── MODAL 3: LOG MONEY LENT ──────────────────────────────── */}
+      {/* ── MODAL 3: LOG / EDIT MONEY LENT ──────────────────────── */}
       {showLentModal && (
         <div className="modal-backdrop" onClick={() => setShowLentModal(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>Log Money Lent</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {editingLent ? '✏️ Edit Money Lent Record' : '🤝 Log Money Lent'}
+              </h3>
               <button className="btn btn-secondary btn-sm" onClick={() => setShowLentModal(false)} style={{ padding: 6 }}>
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateLent} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <form onSubmit={handleSaveLent} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Borrower Person Name</label>
                 <input
@@ -1111,6 +1293,65 @@ export default function FinanceTrackerPage() {
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
                 <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setRepayModalItem(null)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Repayment</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ── MODAL 5: ADJUST / SET NET CURRENT BALANCE ──────────── */}
+      {showAdjustModal && (
+        <div className="modal-backdrop" onClick={() => setShowAdjustModal(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>Set Net Current Balance</h3>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowAdjustModal(false)} style={{ padding: 6 }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border)', marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Current Net Balance</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: summary.netBalance >= 0 ? '#10b981' : '#ef4444', marginTop: 2 }}>
+                ₹{summary.netBalance.toLocaleString()}
+              </div>
+            </div>
+
+            <form onSubmit={handleAdjustBalanceSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+                  New / Target Net Balance (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  className="input"
+                  placeholder="e.g. 50000"
+                  value={targetBalanceInput}
+                  onChange={e => setTargetBalanceInput(e.target.value)}
+                  style={{ width: '100%', height: 42, borderRadius: 10 }}
+                />
+              </div>
+
+              {targetBalanceInput !== '' && !isNaN(Number(targetBalanceInput)) && (
+                <div style={{ fontSize: 12, padding: '10px 12px', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                  {Number(targetBalanceInput) - summary.netBalance > 0 ? (
+                    <span style={{ color: '#10b981', fontWeight: 600 }}>
+                      ▲ Logs an Income adjustment of +₹{(Number(targetBalanceInput) - summary.netBalance).toLocaleString()}
+                    </span>
+                  ) : Number(targetBalanceInput) - summary.netBalance < 0 ? (
+                    <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                      ▼ Logs an Expense adjustment of -₹{Math.abs(Number(targetBalanceInput) - summary.netBalance).toLocaleString()}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>No change in net balance.</span>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowAdjustModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Update Net Balance</button>
               </div>
             </form>
           </div>
