@@ -372,10 +372,10 @@ export default function FinanceTrackerPage() {
             </div>
           </div>
           <div style={{ fontSize: 24, fontWeight: 800, color: summary.netBalance >= 0 ? '#10b981' : '#ef4444' }}>
-            ${summary.netBalance.toLocaleString()}
+            ₹{summary.netBalance.toLocaleString()}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-            Total Income (${summary.totalIncome.toLocaleString()}) - Expenses (${summary.totalExpense.toLocaleString()})
+            Total Income (₹{summary.totalIncome.toLocaleString()}) - Expenses (₹{summary.totalExpense.toLocaleString()})
           </div>
         </div>
 
@@ -388,7 +388,7 @@ export default function FinanceTrackerPage() {
             </div>
           </div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>
-            ${summary.totalCommittedIncome.toLocaleString()}
+            ₹{summary.totalCommittedIncome.toLocaleString()}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
             {summary.pendingCommittedCount} pending client milestone contracts
@@ -404,7 +404,7 @@ export default function FinanceTrackerPage() {
             </div>
           </div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>
-            ${summary.totalMoneyLentOutstanding.toLocaleString()}
+            ₹{summary.totalMoneyLentOutstanding.toLocaleString()}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
             {summary.outstandingLentCount} active borrower accounts
@@ -420,7 +420,7 @@ export default function FinanceTrackerPage() {
             </div>
           </div>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#f59e0b' }}>
-            ${summary.projectedWealth.toLocaleString()}
+            ₹{summary.projectedWealth.toLocaleString()}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
             Balance + Committed Revenue + Money Lent
@@ -539,7 +539,7 @@ export default function FinanceTrackerPage() {
                       fontSize: 18, fontWeight: 800,
                       color: tx.type === 'income' ? '#10b981' : '#ef4444'
                     }}>
-                      {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString()}
+                      {tx.type === 'income' ? '+' : '-'}₹{tx.amount.toLocaleString()}
                     </span>
 
                     <button
@@ -610,7 +610,7 @@ export default function FinanceTrackerPage() {
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                       <span style={{ fontSize: 20, fontWeight: 800, color: '#8b5cf6' }}>
-                        ${item.amount.toLocaleString()}
+                        ₹{item.amount.toLocaleString()}
                       </span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         Due: {format(new Date(item.dueDate), 'MMM d, yyyy')}
@@ -699,11 +699,11 @@ export default function FinanceTrackerPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
                       <div>
                         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Original Lent</span>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>${item.amount.toLocaleString()}</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>₹{item.amount.toLocaleString()}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Outstanding</span>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: outstanding > 0 ? '#ef4444' : '#10b981' }}>${outstanding.toLocaleString()}</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: outstanding > 0 ? '#ef4444' : '#10b981' }}>₹{outstanding.toLocaleString()}</div>
                       </div>
                     </div>
 
@@ -841,7 +841,7 @@ export default function FinanceTrackerPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Amount ($)</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Amount (₹)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -950,7 +950,7 @@ export default function FinanceTrackerPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Committed Amount ($)</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Committed Amount (₹)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1020,7 +1020,7 @@ export default function FinanceTrackerPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Lent Amount ($)</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Lent Amount (₹)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1089,13 +1089,13 @@ export default function FinanceTrackerPage() {
             <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border)', marginBottom: 14 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Borrower: {repayModalItem.borrowerName}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                Outstanding Amount: ${ (repayModalItem.amount - (repayModalItem.repaidAmount || 0)).toLocaleString() }
+                Outstanding Amount: ₹{ (repayModalItem.amount - (repayModalItem.repaidAmount || 0)).toLocaleString() }
               </div>
             </div>
 
             <form onSubmit={handleRepaySubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Repayment Amount Received ($)</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Repayment Amount Received (₹)</label>
                 <input
                   type="number"
                   step="0.01"

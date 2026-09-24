@@ -710,7 +710,7 @@ export default function JobTrackerPage() {
                   <label style={labelStyle}>Salary / Compensation Range</label>
                   <input
                     className="input"
-                    placeholder="e.g. $120k - $150k or $60/hr"
+                    placeholder="e.g. ₹12L - ₹18L or ₹1,000/hr"
                     value={salary}
                     onChange={e => setSalary(e.target.value)}
                   />

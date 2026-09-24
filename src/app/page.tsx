@@ -408,15 +408,15 @@ export default function DashboardPage() {
               <Wallet size={20} />
             </div>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.15)', padding: '3px 8px', borderRadius: 6 }}>
-              ${financeSummary?.netBalance.toLocaleString() || 0} Net
+              ₹{financeSummary?.netBalance.toLocaleString() || 0} Net
             </span>
           </div>
           <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>
-            ${financeSummary?.projectedWealth.toLocaleString() || 0}
+            ₹{financeSummary?.projectedWealth.toLocaleString() || 0}
           </div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Projected Total Wealth</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-            Committed: ${financeSummary?.totalCommittedIncome.toLocaleString() || 0} • Lent: ${financeSummary?.totalMoneyLentOutstanding.toLocaleString() || 0}
+            Committed: ₹{financeSummary?.totalCommittedIncome.toLocaleString() || 0} • Lent: ₹{financeSummary?.totalMoneyLentOutstanding.toLocaleString() || 0}
           </div>
         </div>
 
@@ -507,7 +507,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>
-            ${clientStats.totalPipelineValue.toLocaleString()}
+            ₹{clientStats.totalPipelineValue.toLocaleString()}
           </div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Client Pipeline Value</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
@@ -601,13 +601,13 @@ export default function DashboardPage() {
             <div style={{ padding: '14px 16px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>NET BALANCE</span>
               <div style={{ fontSize: 20, fontWeight: 800, color: (financeSummary?.netBalance || 0) >= 0 ? '#10b981' : '#ef4444', marginTop: 4 }}>
-                ${financeSummary?.netBalance.toLocaleString() || 0}
+                ₹{financeSummary?.netBalance.toLocaleString() || 0}
               </div>
             </div>
             <div style={{ padding: '14px 16px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>PROJECTED WEALTH</span>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#f59e0b', marginTop: 4 }}>
-                ${financeSummary?.projectedWealth.toLocaleString() || 0}
+                ₹{financeSummary?.projectedWealth.toLocaleString() || 0}
               </div>
             </div>
           </div>
@@ -616,7 +616,7 @@ export default function DashboardPage() {
             <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#8b5cf6' }}>COMMITTED CLIENT REVENUE</span>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
-                ${financeSummary?.totalCommittedIncome.toLocaleString() || 0}
+                ₹{financeSummary?.totalCommittedIncome.toLocaleString() || 0}
               </div>
               <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{financeSummary?.pendingCommittedCount || 0} pending contracts</span>
             </div>
@@ -624,7 +624,7 @@ export default function DashboardPage() {
             <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#06b6d4' }}>OUTSTANDING MONEY LENT</span>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
-                ${financeSummary?.totalMoneyLentOutstanding.toLocaleString() || 0}
+                ₹{financeSummary?.totalMoneyLentOutstanding.toLocaleString() || 0}
               </div>
               <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{financeSummary?.outstandingLentCount || 0} active borrowers</span>
             </div>
@@ -1139,7 +1139,7 @@ export default function DashboardPage() {
             <div style={{ padding: '14px 16px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>PIPELINE VALUE</span>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#10b981', marginTop: 4 }}>
-                ${clientStats.totalPipelineValue.toLocaleString()}
+                ₹{clientStats.totalPipelineValue.toLocaleString()}
               </div>
             </div>
           </div>
@@ -1190,7 +1190,7 @@ export default function DashboardPage() {
                   }}>
                     <div>
                       <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{a.clientName}</span>
-                      {a.dealValue ? <span style={{ color: '#10b981', fontWeight: 600, marginLeft: 6 }}>(${a.dealValue})</span> : null}
+                      {a.dealValue ? <span style={{ color: '#10b981', fontWeight: 600, marginLeft: 6 }}>(₹{a.dealValue.toLocaleString()})</span> : null}
                     </div>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,

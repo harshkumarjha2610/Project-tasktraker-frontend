@@ -227,7 +227,7 @@ export default function ClientApproachesPage() {
             <DollarSign size={16} /> PIPELINE VALUE
           </div>
           <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)' }}>
-            ${totalPipelineValue.toLocaleString()}
+            ₹{totalPipelineValue.toLocaleString()}
           </div>
         </div>
       </div>
@@ -350,7 +350,7 @@ export default function ClientApproachesPage() {
                         <span>📅 {format(new Date(item.date), 'MMM d, yyyy · h:mm a')}</span>
                         <span>Platform: <strong>{platformObj.label}</strong></span>
                         {item.dealValue && item.dealValue > 0 ? (
-                          <span style={{ color: '#10b981', fontWeight: 700 }}>💵 ${item.dealValue.toLocaleString()}</span>
+                          <span style={{ color: '#10b981', fontWeight: 700 }}>💵 ₹{item.dealValue.toLocaleString()}</span>
                         ) : null}
                       </div>
                     </div>
@@ -478,7 +478,7 @@ export default function ClientApproachesPage() {
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Estimated Deal Value ($)</label>
+                  <label style={labelStyle}>Estimated Deal Value (₹)</label>
                   <input
                     type="number"
                     min="0"
