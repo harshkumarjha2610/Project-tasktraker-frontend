@@ -3,12 +3,13 @@
 import { useTaskContext } from '@/context/TaskContext';
 import { usePomodoroContext } from '@/context/PomodoroContext';
 import { useStreakContext } from '@/context/StreakContext';
-import { getNotes, getEnglishPracticeLogs, getJobs, getClientApproaches } from '@/lib/api';
+import { getNotes, getEnglishPracticeLogs, getJobs, getClientApproaches, getFinanceSummary } from '@/lib/api';
 import { Note } from '@/types/note';
 import { Task, Priority, Category } from '@/types/task';
 import { EnglishPracticeLog } from '@/types/englishPractice';
 import { JobRecord } from '@/types/jobTracker';
 import { ClientApproachRecord } from '@/types/clientApproach';
+import { FinanceSummary } from '@/types/finance';
 import { useState, useMemo, useEffect } from 'react';
 import TaskCard from '@/components/TaskCard';
 import TaskModal from '@/components/TaskModal';
@@ -19,7 +20,7 @@ import {
   Clock, Target, StickyNote, Zap, ShieldAlert, BarChart3, PieChart,
   ArrowUpRight, Award, CheckCircle2, ChevronRight, Layers, FileText,
   Activity, Sparkles, Database, HardDrive, Languages, Briefcase, UserPlus,
-  DollarSign, Mic, Headphones, Book, BookOpen, Star, Building, UserCheck
+  DollarSign, Mic, Headphones, Book, BookOpen, Star, Building, UserCheck, Wallet
 } from 'lucide-react';
 import { format, isToday, isTomorrow, isPast } from 'date-fns';
 
@@ -57,12 +58,13 @@ export default function DashboardPage() {
   const [englishLogs, setEnglishLogs] = useState<EnglishPracticeLog[]>([]);
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [clientApproaches, setClientApproaches] = useState<ClientApproachRecord[]>([]);
+  const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  // Fetch website-wide data (Notes, English Practice, Jobs, Client Approaches)
+  // Fetch website-wide data (Notes, English Practice, Jobs, Client Approaches, Finance)
   useEffect(() => {
     let isMounted = true;
     Promise.all([
@@ -70,12 +72,14 @@ export default function DashboardPage() {
       getEnglishPracticeLogs().catch(err => { console.error('[Dashboard] getEnglishPracticeLogs error:', err); return []; }),
       getJobs().catch(err => { console.error('[Dashboard] getJobs error:', err); return []; }),
       getClientApproaches().catch(err => { console.error('[Dashboard] getClientApproaches error:', err); return []; }),
-    ]).then(([notesData, englishData, jobsData, approachesData]) => {
+      getFinanceSummary().catch(err => { console.error('[Dashboard] getFinanceSummary error:', err); return null; }),
+    ]).then(([notesData, englishData, jobsData, approachesData, financeData]) => {
       if (isMounted) {
         setNotes(notesData || []);
         setEnglishLogs(englishData || []);
         setJobs(jobsData || []);
         setClientApproaches(approachesData || []);
+        setFinanceSummary(financeData);
         setDashboardLoading(false);
       }
     });
@@ -376,6 +380,9 @@ export default function DashboardPage() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link href="/finance" className="btn btn-secondary btn-sm" style={{ gap: 6 }}>
+            💳 Finance Tracker
+          </Link>
           <Link href="/english-practice" className="btn btn-secondary btn-sm" style={{ gap: 6 }}>
             🗣️ English Practice
           </Link>
@@ -394,6 +401,25 @@ export default function DashboardPage() {
         gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
         gap: 16,
       }}>
+        {/* KPI: Finance & Projected Net Worth */}
+        <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.14), rgba(16,185,129,0.03))', border: '1px solid rgba(16,185,129,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(16,185,129,0.18)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Wallet size={20} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.15)', padding: '3px 8px', borderRadius: 6 }}>
+              ${financeSummary?.netBalance.toLocaleString() || 0} Net
+            </span>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>
+            ${financeSummary?.projectedWealth.toLocaleString() || 0}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Projected Total Wealth</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            Committed: ${financeSummary?.totalCommittedIncome.toLocaleString() || 0} • Lent: ${financeSummary?.totalMoneyLentOutstanding.toLocaleString() || 0}
+          </div>
+        </div>
+
         {/* KPI 0: App Daily Streak */}
         <div className="stat-card" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(234,88,12,0.05))', border: '1px solid rgba(245,158,11,0.3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -546,6 +572,65 @@ export default function DashboardPage() {
       {/* ── DETAILED ANALYTICS SECTIONS ───────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 450px), 1fr))', gap: 20 }}>
         
+        {/* ── ANALYTICS CARD: Finance & Committed Client Revenue ── */}
+        <div style={{
+          padding: '22px 24px',
+          borderRadius: 20,
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(16,185,129,0.18)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Wallet size={20} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Finance & Committed Revenue</h3>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Net Balance, Client Commitments & Money Lent</span>
+              </div>
+            </div>
+            <Link href="/finance" style={{ fontSize: 12, fontWeight: 600, color: '#10b981', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+              Open Finance Tracker <ArrowUpRight size={14} />
+            </Link>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ padding: '14px 16px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>NET BALANCE</span>
+              <div style={{ fontSize: 20, fontWeight: 800, color: (financeSummary?.netBalance || 0) >= 0 ? '#10b981' : '#ef4444', marginTop: 4 }}>
+                ${financeSummary?.netBalance.toLocaleString() || 0}
+              </div>
+            </div>
+            <div style={{ padding: '14px 16px', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>PROJECTED WEALTH</span>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#f59e0b', marginTop: 4 }}>
+                ${financeSummary?.projectedWealth.toLocaleString() || 0}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#8b5cf6' }}>COMMITTED CLIENT REVENUE</span>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
+                ${financeSummary?.totalCommittedIncome.toLocaleString() || 0}
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{financeSummary?.pendingCommittedCount || 0} pending contracts</span>
+            </div>
+
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#06b6d4' }}>OUTSTANDING MONEY LENT</span>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 2 }}>
+                ${financeSummary?.totalMoneyLentOutstanding.toLocaleString() || 0}
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{financeSummary?.outstandingLentCount || 0} active borrowers</span>
+            </div>
+          </div>
+        </div>
+
         {/* ── ANALYTICS CARD: Daily Productive Day Tracker (10 Pomodoros x 60m = 600m Goal) ── */}
         <div style={{
           padding: '22px 24px',

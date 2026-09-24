@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CheckSquare, BarChart3, Tag, Settings,
   Zap, X, Sun, Moon, PanelLeftClose, PanelLeftOpen, Gamepad2, StickyNote, Hourglass, Timer,
-  Languages, UserPlus, Briefcase, Flame
+  Languages, UserPlus, Briefcase, Flame, Wallet
 } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useStreakContext } from '@/context/StreakContext';
@@ -13,6 +13,7 @@ import { useStreakContext } from '@/context/StreakContext';
 const NAV_ITEMS = [
   { href: '/',                  icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/tasks',             icon: CheckSquare,     label: 'Tasks' },
+  { href: '/finance',           icon: Wallet,          label: 'Finance Tracker' },
   { href: '/job-tracker',       icon: Briefcase,       label: 'Daily Job Tracker' },
   { href: '/english-practice',  icon: Languages,        label: 'English Practice' },
   { href: '/client-approaches', icon: UserPlus,         label: 'Client Approaches' },
