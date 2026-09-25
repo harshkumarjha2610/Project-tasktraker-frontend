@@ -11,6 +11,7 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Extension } from '@tiptap/core';
 import { compressImageFile } from '@/lib/noteUtils';
 import DrawingCanvasModal from '@/components/DrawingCanvasModal';
+import InNotePencilCanvas from '@/components/InNotePencilCanvas';
 
 // Custom extension for font size
 const FontSize = Extension.create({
@@ -185,7 +186,19 @@ const TEXT_COLORS = [
 ];
 
 // Toolbar Component for TipTap
-const MenuBar = ({ editor, color, onOpenDrawing }: { editor: any; color: string; onOpenDrawing: () => void }) => {
+const MenuBar = ({
+  editor,
+  color,
+  isPencilMode,
+  onTogglePencilMode,
+  onOpenStudio,
+}: {
+  editor: any;
+  color: string;
+  isPencilMode: boolean;
+  onTogglePencilMode: () => void;
+  onOpenStudio: () => void;
+}) => {
   const [activeHighlightColor, setActiveHighlightColor] = useState('#fef08a');
   const [activeTextColor, setActiveTextColor] = useState('#ef4444');
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
@@ -550,27 +563,49 @@ const MenuBar = ({ editor, color, onOpenDrawing }: { editor: any; color: string;
 
       <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 2px', flexShrink: 0 }} />
 
-      {/* Pencil / Freehand Drawing Tool Button */}
+      {/* Pencil / Direct In-Note Freehand Writing Mode Toggle */}
       <button
         type="button"
-        onClick={onOpenDrawing}
+        onClick={onTogglePencilMode}
         style={{
-          ...btnStyle(false),
+          ...btnStyle(isPencilMode),
           gap: 5,
           padding: '3px 10px',
           height: 26,
           fontSize: 12,
           fontWeight: 700,
-          background: 'linear-gradient(135deg, rgba(56,189,248,0.22), rgba(139,92,246,0.22))',
+          background: isPencilMode
+            ? 'linear-gradient(135deg, #38bdf8, #8b5cf6)'
+            : 'linear-gradient(135deg, rgba(56,189,248,0.22), rgba(139,92,246,0.22))',
           border: '1px solid rgba(56,189,248,0.4)',
-          color: '#38bdf8',
+          color: isPencilMode ? '#0f172a' : '#38bdf8',
           borderRadius: 8,
-          boxShadow: '0 2px 8px rgba(56,189,248,0.15)',
+          boxShadow: isPencilMode ? '0 0 12px rgba(56,189,248,0.5)' : '0 2px 8px rgba(56,189,248,0.15)',
         }}
-        title="✏️ Draw & sketch anything with Pencil (Freehand Canvas Studio)"
+        title="✏️ Write/draw directly on top of note paper with Pencil"
       >
         <Pencil size={15} />
-        <span style={{ fontSize: 11 }}>Pencil / Draw</span>
+        <span style={{ fontSize: 11 }}>{isPencilMode ? 'Pencil Active (Drawing)' : '✏️ Write with Pencil'}</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onOpenStudio}
+        style={{
+          ...btnStyle(false),
+          gap: 4,
+          padding: '3px 8px',
+          height: 26,
+          fontSize: 11,
+          fontWeight: 600,
+          background: 'rgba(255,255,255,0.05)',
+          border: `1px solid ${color}20`,
+          color: color,
+          borderRadius: 6,
+        }}
+        title="Open Full Canvas Studio Modal"
+      >
+        <span>🎨 Studio</span>
       </button>
     </div>
   );
@@ -583,6 +618,8 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
 
+  const [isPencilMode, setIsPencilMode] = useState(false);
+  const [pencilLayerData, setPencilLayerData] = useState<Record<string, string>>({});
   const [showDrawingCanvas, setShowDrawingCanvas] = useState(false);
 
   const [currentNoteId, setCurrentNoteId] = useState<string | undefined>(undefined);
@@ -1146,7 +1183,13 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
             </div>
           </div>
 
-          <MenuBar editor={editor} color={textColor} onOpenDrawing={() => setShowDrawingCanvas(true)} />
+          <MenuBar
+            editor={editor}
+            color={textColor}
+            isPencilMode={isPencilMode}
+            onTogglePencilMode={() => setIsPencilMode(!isPencilMode)}
+            onOpenStudio={() => setShowDrawingCanvas(true)}
+          />
           
           {/* Tabs Bar */}
           <div style={{
@@ -1278,7 +1321,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
             }
           `}} />
 
-          {/* Editor Area */}
+          {/* Editor Area with Direct In-Note Freehand Pencil Layer Overlay */}
           <div 
             className="note-editor-container"
             style={{ 
@@ -1294,7 +1337,17 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
               backgroundAttachment: 'local',
             }}
           >
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100%', scrollBehavior: 'smooth' }}>
+            <InNotePencilCanvas
+              isPencilMode={isPencilMode}
+              onTogglePencilMode={setIsPencilMode}
+              initialDataUrl={pencilLayerData[activeTabId]}
+              onChangeDataUrl={(dataUrl) => {
+                setPencilLayerData(prev => ({ ...prev, [activeTabId]: dataUrl }));
+              }}
+              textColor={textColor}
+            />
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100%', scrollBehavior: 'smooth', position: 'relative', zIndex: 10 }}>
               <EditorContent editor={editor} style={{ flex: 1, display: 'flex', flexDirection: 'column', scrollBehavior: 'smooth' }} />
             </div>
           </div>
