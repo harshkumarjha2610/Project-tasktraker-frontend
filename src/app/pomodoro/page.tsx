@@ -6,9 +6,10 @@ import {
   CheckCircle2, Flame, Award, Clock, Sparkles, Target, X, Check,
   Maximize2, Minimize2, Plus, Minus, Zap, CloudRain, Waves, Wind,
   Coffee, Music, RefreshCw, Trophy, Quote, AlertTriangle, ShieldAlert,
-  Palette, BellRing, Sliders, Calendar, Filter
+  Palette, BellRing, Sliders, Calendar, Filter, BarChart3, Activity
 } from 'lucide-react';
 import { useTaskContext } from '@/context/TaskContext';
+import PomodoroAnalyticsDashboard from '@/components/PomodoroAnalyticsDashboard';
 import {
   usePomodoroContext,
   THEME_PALETTES,
@@ -47,6 +48,7 @@ export default function PomodoroPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<HistoryDateFilter>('today');
   const [customDate, setCustomDate] = useState<string>('');
+  const [viewTab, setViewTab] = useState<'both' | 'timer' | 'analytics'>('both');
 
   // Auto-select task if passed via URL parameter e.g. /pomodoro?taskId=123
   useEffect(() => {
@@ -309,6 +311,88 @@ export default function PomodoroPage() {
           </div>
         </div>
       )}
+
+      {/* ── View Switcher Tabs (Timer vs Graphical Analytics) ────── */}
+      {!zenMode && (
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          marginBottom: 20,
+          background: 'var(--bg-card)',
+          padding: 6,
+          borderRadius: 14,
+          border: '1px solid var(--border)',
+          width: 'fit-content',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            onClick={() => setViewTab('both')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 700,
+              border: 'none',
+              background: viewTab === 'both' ? 'var(--accent)' : 'transparent',
+              color: viewTab === 'both' ? '#ffffff' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Flame size={16} />
+            <span>Complete Focus Studio (Both)</span>
+          </button>
+
+          <button
+            onClick={() => setViewTab('timer')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 700,
+              border: 'none',
+              background: viewTab === 'timer' ? 'var(--accent)' : 'transparent',
+              color: viewTab === 'timer' ? '#ffffff' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Clock size={16} />
+            <span>Pomodoro Clock Timer</span>
+          </button>
+
+          <button
+            onClick={() => setViewTab('analytics')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 700,
+              border: 'none',
+              background: viewTab === 'analytics' ? 'var(--accent)' : 'transparent',
+              color: viewTab === 'analytics' ? '#ffffff' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <BarChart3 size={16} />
+            <span>📊 Graphical Analytics &amp; Past Days</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Main Timer Section ───────────────────────────────────── */}
+      {(viewTab === 'both' || viewTab === 'timer') && (
+        <>
 
       {/* ── Theme Palette & Background Quick Customizer Bar ─────── */}
       {!zenMode && (
@@ -1151,6 +1235,17 @@ export default function PomodoroPage() {
             <RefreshCw size={14} />
           </button>
         </div>
+      )}
+      </>)}
+
+      {/* ── Graphical Analytics & Past-Days Experience Dashboard ────── */}
+      {!zenMode && (viewTab === 'both' || viewTab === 'analytics') && (
+        <PomodoroAnalyticsDashboard
+          history={history}
+          wasteHistory={wasteHistory}
+          tasks={tasks}
+          formatSecsToHoursMins={formatSecsToHoursMins}
+        />
       )}
 
       {/* ── Date-Wise Filter Control Bar ────────────────────────── */}

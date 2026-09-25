@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette, Image as ImageIcon, Type, Pencil } from 'lucide-react';
+import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette, Image as ImageIcon, Type, Pencil, MousePointer } from 'lucide-react';
 import { Note } from '@/types/note';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -150,6 +150,100 @@ const TEXT_COLOR_MAP: Record<string, string> = {
   yellow: '#ffffff',
 };
 
+export interface CursorOption {
+  id: string;
+  name: string;
+  icon: string;
+  hotspotX: number;
+  hotspotY: number;
+  fallback: string;
+  svgDataUrl: string;
+}
+
+export const CURSOR_OPTIONS: CursorOption[] = [
+  {
+    id: 'pencil',
+    name: 'Writing Pencil',
+    icon: '✏️',
+    hotspotX: 3,
+    hotspotY: 25,
+    fallback: 'crosshair',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M3 25 L8 24 L22 10 L17 5 L3 19 Z' fill='%23f59e0b' stroke='%23050508' stroke-width='2' stroke-linejoin='round'/%3E%3Cpolygon points='3,25 7,24 4,21' fill='%231e293b'/%3E%3Cpolygon points='3,25 5,24.5 4,23.5' fill='%2338bdf8'/%3E%3Cpath d='M17 5 L22 10 L25 7 L20 2 Z' fill='%23f43f5e' stroke='%23050508' stroke-width='1.5'/%3E%3C/svg%3E`,
+  },
+  {
+    id: 'fountain',
+    name: 'Fountain Pen',
+    icon: '✒️',
+    hotspotX: 2,
+    hotspotY: 26,
+    fallback: 'crosshair',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M2 26 L9 24 L24 9 L18 3 L3 18 Z' fill='%2338bdf8' stroke='%23050508' stroke-width='2' stroke-linejoin='round'/%3E%3Cpolygon points='2,26 8,23 5,20' fill='%23e2e8f0' stroke='%23050508' stroke-width='1.5'/%3E%3Cline x1='2' y1='26' x2='5.5' y2='22.5' stroke='%23050508' stroke-width='1.5'/%3E%3Ccircle cx='5.5' cy='22.5' r='1' fill='%23050508'/%3E%3C/svg%3E`,
+  },
+  {
+    id: 'brush',
+    name: 'Artist Brush',
+    icon: '🖌️',
+    hotspotX: 3,
+    hotspotY: 25,
+    fallback: 'crosshair',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M3 25 C3 25 5 20 8 18 L24 2 C25 1 27 3 26 4 L10 20 C8 23 3 25 3 25 Z' fill='%23ec4899' stroke='%23050508' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M3 25 C4 23 6 22 7.5 21 C6.5 23 5 24.5 3 25 Z' fill='%2338bdf8'/%3E%3C/svg%3E`,
+  },
+  {
+    id: 'crosshair',
+    name: 'Precision Target',
+    icon: '🎯',
+    hotspotX: 14,
+    hotspotY: 14,
+    fallback: 'crosshair',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='11' stroke='%23ffffff' stroke-width='3' fill='none'/%3E%3Ccircle cx='14' cy='14' r='11' stroke='%230f172a' stroke-width='1.5' fill='none'/%3E%3Ccircle cx='14' cy='14' r='5' stroke='%2338bdf8' stroke-width='2' fill='none'/%3E%3Cline x1='14' y1='0' x2='14' y2='28' stroke='%2338bdf8' stroke-width='2'/%3E%3Cline x1='0' y1='14' x2='28' y2='14' stroke='%2338bdf8' stroke-width='2'/%3E%3Ccircle cx='14' cy='14' r='2' fill='%23ef4444'/%3E%3C/svg%3E`,
+  },
+  {
+    id: 'magic',
+    name: 'Magic Wand',
+    icon: '🪄',
+    hotspotX: 24,
+    hotspotY: 4,
+    fallback: 'crosshair',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M4 24 L22 6' stroke='%23050508' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M4 24 L22 6' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpolygon points='24,0 25.5,3 29,4 25.5,5 24,8 22.5,5 19,4 22.5,3' fill='%23f59e0b' stroke='%23050508' stroke-width='0.8'/%3E%3Ccircle cx='24' cy='4' r='2' fill='%23ffffff'/%3E%3C/svg%3E`,
+  },
+  {
+    id: 'laser',
+    name: 'Laser Dot',
+    icon: '🔴',
+    hotspotX: 14,
+    hotspotY: 14,
+    fallback: 'crosshair',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='14' cy='14' r='10' fill='rgba(239, 68, 68, 0.25)' stroke='%23ef4444' stroke-width='1.5' stroke-dasharray='3 2'/%3E%3Ccircle cx='14' cy='14' r='6' stroke='%23ffffff' stroke-width='2' fill='none'/%3E%3Ccircle cx='14' cy='14' r='4' fill='%23ef4444'/%3E%3Ccircle cx='14' cy='14' r='1.5' fill='%23ffffff'/%3E%3C/svg%3E`,
+  },
+  {
+    id: 'quill',
+    name: 'Feather Quill',
+    icon: '🪶',
+    hotspotX: 2,
+    hotspotY: 26,
+    fallback: 'crosshair',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M2 26 C2 26 8 20 12 14 C16 8 22 2 26 2 C26 2 24 10 18 16 C12 22 2 26 2 26 Z' fill='%23e2e8f0' stroke='%230f172a' stroke-width='2'/%3E%3Cpath d='M2 26 L16 12' stroke='%2310b981' stroke-width='1.5'/%3E%3Cpolygon points='2,26 4,23 6,25' fill='%2310b981'/%3E%3C/svg%3E`,
+  },
+  {
+    id: 'text',
+    name: 'Classic Text I-Beam',
+    icon: '⌶',
+    hotspotX: 12,
+    hotspotY: 12,
+    fallback: 'text',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 4h10M7 20h10M12 4v16' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M7 4h10M7 20h10M12 4v16' stroke='%230f172a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E`,
+  },
+  {
+    id: 'arrow',
+    name: 'Neon Pointer',
+    icon: '↖️',
+    hotspotX: 3,
+    hotspotY: 3,
+    fallback: 'default',
+    svgDataUrl: `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M3 3 L11 25 L15 15 L25 11 Z' fill='%2338bdf8' stroke='%23050508' stroke-width='2.5' stroke-linejoin='round'/%3E%3Cpath d='M3 3 L11 25 L15 15 L25 11 Z' fill='%2338bdf8'/%3E%3Ccircle cx='3' cy='3' r='1.5' fill='%23ffffff'/%3E%3C/svg%3E`,
+  },
+];
+
 const HIGHLIGHT_COLORS = [
   { name: 'Yellow', color: '#fef08a' },
   { name: 'Green', color: '#bbf7d0' },
@@ -188,12 +282,16 @@ const MenuBar = ({
   isPencilMode,
   onTogglePencilMode,
   onOpenStudio,
+  cursorStyle,
+  onSelectCursorStyle,
 }: {
   editor: any;
   color: string;
   isPencilMode: boolean;
   onTogglePencilMode: () => void;
   onOpenStudio: () => void;
+  cursorStyle: string;
+  onSelectCursorStyle: (style: string) => void;
 }) => {
   const [activeHighlightColor, setActiveHighlightColor] = useState('#fef08a');
   const [activeTextColor, setActiveTextColor] = useState('#ef4444');
@@ -334,6 +432,34 @@ const MenuBar = ({
           </optgroup>
         </select>
       </div>
+
+      {/* Cursor Style Selector Dropdown */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, padding: '3px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}15` }}>
+        <MousePointer size={14} style={{ color: color, opacity: 0.8, marginLeft: 2 }} />
+        <select
+          value={cursorStyle}
+          onChange={(e) => onSelectCursorStyle(e.target.value)}
+          style={{
+            background: 'transparent',
+            color: color,
+            border: 'none',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            height: 24,
+            outline: 'none',
+            maxWidth: 155,
+          }}
+          title="Select Cursor Style (Pencil, Fountain Pen, Artist Brush, Laser, Wand, Target, etc.)"
+        >
+          {CURSOR_OPTIONS.map((c) => (
+            <option key={c.id} value={c.id} style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>
+              {c.icon} {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 2px', flexShrink: 0 }} />
       <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} style={btnStyle(editor.isActive('bold'))}><Bold size={16} /></button>
       <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} style={btnStyle(editor.isActive('italic'))}><Italic size={16} /></button>
@@ -617,6 +743,26 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
   const [isPencilMode, setIsPencilMode] = useState(false);
   const [pencilLayerData, setPencilLayerData] = useState<Record<string, string>>({});
   const [showDrawingCanvas, setShowDrawingCanvas] = useState(false);
+
+  const [cursorStyle, setCursorStyle] = useState<string>('pencil');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedCursor = localStorage.getItem('dt_note_cursor_style');
+      if (savedCursor && CURSOR_OPTIONS.some(c => c.id === savedCursor)) {
+        setCursorStyle(savedCursor);
+      }
+    }
+  }, []);
+
+  const handleCursorChange = (newCursorId: string) => {
+    setCursorStyle(newCursorId);
+    try {
+      localStorage.setItem('dt_note_cursor_style', newCursorId);
+    } catch (e) {
+      // ignore
+    }
+  };
 
   const [currentNoteId, setCurrentNoteId] = useState<string | undefined>(undefined);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
@@ -1211,6 +1357,8 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
             isPencilMode={isPencilMode}
             onTogglePencilMode={() => setIsPencilMode(!isPencilMode)}
             onOpenStudio={() => setShowDrawingCanvas(true)}
+            cursorStyle={cursorStyle}
+            onSelectCursorStyle={handleCursorChange}
           />
           
           {/* Tabs Bar */}
@@ -1297,51 +1445,57 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
             </button>
           </div>
           
-          <style dangerouslySetInnerHTML={{__html: `
-            .note-editor-container, .tiptap-editor, .tiptap-editor *, .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable] { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 4h10M7 20h10M12 4v16' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M7 4h10M7 20h10M12 4v16' stroke='%230f172a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, text !important; }
-            .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor}; caret-color: ${textColor} !important; white-space: pre-wrap; }
-            .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable] { color: ${textColor}; caret-color: ${textColor} !important; }
-            .tiptap-editor p { margin: 0; line-height: 32px; min-height: 32px; caret-color: ${textColor} !important; }
-            .tiptap-editor h1 { margin: 0; font-size: 22px; line-height: 32px; font-weight: 700; caret-color: ${textColor} !important; }
-            .tiptap-editor h2 { margin: 0; font-size: 18px; line-height: 32px; font-weight: 700; caret-color: ${textColor} !important; }
-            .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; }
-            .tiptap-editor li { margin: 0; line-height: 32px; caret-color: ${textColor} !important; }
-            .tiptap-editor mark { color: #0f172a !important; padding: 2px 5px; border-radius: 4px; font-weight: 500; }
-            .tiptap-editor img, img.note-editor-image { max-width: 100%; max-height: 520px; object-fit: contain; border-radius: 12px; margin: 12px 0; display: block; box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.12); cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-            .tiptap-editor img:hover, img.note-editor-image:hover { transform: scale(1.005); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-            .tiptap-editor img.ProseMirror-selectednode, img.note-editor-image.ProseMirror-selectednode { outline: 3px solid #3b82f6 !important; border-radius: 12px; }
-            .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 32px; line-height: 32px; pointer-events: none; }
+          {(() => {
+            const activeCursorObj = CURSOR_OPTIONS.find(c => c.id === cursorStyle) || CURSOR_OPTIONS[0];
+            const cursorCssRule = `cursor: url("${activeCursorObj.svgDataUrl}") ${activeCursorObj.hotspotX} ${activeCursorObj.hotspotY}, ${activeCursorObj.fallback} !important;`;
+            return (
+              <style dangerouslySetInnerHTML={{__html: `
+                .note-editor-container, .tiptap-editor, .tiptap-editor *, .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable], canvas.in-note-pencil-canvas { ${cursorCssRule} }
+                .tiptap-editor { outline: none; min-height: 100%; font-size: 16px; line-height: 32px; color: ${textColor}; caret-color: ${textColor} !important; white-space: pre-wrap; }
+                .note-modal-container input, .note-modal-container textarea, .note-modal-container [contenteditable] { color: ${textColor}; caret-color: ${textColor} !important; }
+                .tiptap-editor p { margin: 0; line-height: 32px; min-height: 32px; caret-color: ${textColor} !important; }
+                .tiptap-editor h1 { margin: 0; font-size: 22px; line-height: 32px; font-weight: 700; caret-color: ${textColor} !important; }
+                .tiptap-editor h2 { margin: 0; font-size: 18px; line-height: 32px; font-weight: 700; caret-color: ${textColor} !important; }
+                .tiptap-editor ul, .tiptap-editor ol { margin: 0; padding-left: 24px; line-height: 32px; }
+                .tiptap-editor li { margin: 0; line-height: 32px; caret-color: ${textColor} !important; }
+                .tiptap-editor mark { color: #0f172a !important; padding: 2px 5px; border-radius: 4px; font-weight: 500; }
+                .tiptap-editor img, img.note-editor-image { max-width: 100%; max-height: 520px; object-fit: contain; border-radius: 12px; margin: 12px 0; display: block; box-shadow: 0 4px 16px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.12); cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+                .tiptap-editor img:hover, img.note-editor-image:hover { transform: scale(1.005); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+                .tiptap-editor img.ProseMirror-selectednode, img.note-editor-image.ProseMirror-selectednode { outline: 3px solid #3b82f6 !important; border-radius: 12px; }
+                .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: ${textColor}60; float: left; height: 32px; line-height: 32px; pointer-events: none; }
 
-            @media (max-width: 640px) {
-              .note-modal-overlay {
-                padding: 0 !important;
-              }
-              .note-modal-container {
-                width: 100vw !important;
-                height: 100vh !important;
-                min-width: 100% !important;
-                min-height: 100% !important;
-                border-radius: 0 !important;
-                resize: none !important;
-              }
-              .hide-on-mobile {
-                display: none !important;
-              }
-              .note-modal-header {
-                padding: 10px 14px !important;
-              }
-              .note-editor-container, .note-modal-container, .ProseMirror, .tiptap-editor {
-                scroll-behavior: smooth !important;
-              }
-              .note-colors-bar {
-                max-width: 130px;
-              }
-              .note-editor-container {
-                padding: ${color === 'white' ? '24px 16px 24px 16px' : '4px 16px 24px 44px'} !important;
-                background-image: ${mobileBgImage} !important;
-              }
-            }
-          `}} />
+                @media (max-width: 640px) {
+                  .note-modal-overlay {
+                    padding: 0 !important;
+                  }
+                  .note-modal-container {
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    min-width: 100% !important;
+                    min-height: 100% !important;
+                    border-radius: 0 !important;
+                    resize: none !important;
+                  }
+                  .hide-on-mobile {
+                    display: none !important;
+                  }
+                  .note-modal-header {
+                    padding: 10px 14px !important;
+                  }
+                  .note-editor-container, .note-modal-container, .ProseMirror, .tiptap-editor {
+                    scroll-behavior: smooth !important;
+                  }
+                  .note-colors-bar {
+                    max-width: 130px;
+                  }
+                  .note-editor-container {
+                    padding: ${color === 'white' ? '24px 16px 24px 16px' : '4px 16px 24px 44px'} !important;
+                    background-image: ${mobileBgImage} !important;
+                  }
+                }
+              `}} />
+            );
+          })()}
 
           {/* Editor Area with Direct In-Note Freehand Pencil Layer Overlay */}
           <div 

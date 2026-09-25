@@ -482,6 +482,7 @@ export default function InNotePencilCanvas({
       {/* Canvas Element Overlay */}
       <canvas
         ref={canvasRef}
+        className="in-note-pencil-canvas"
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
@@ -494,7 +495,7 @@ export default function InNotePencilCanvas({
           height: '100%',
           display: 'block',
           touchAction: 'none',
-          cursor: isPencilMode ? 'crosshair' : 'default',
+          cursor: isPencilMode ? (tool === 'eraser' ? 'cell' : undefined) : 'default',
         }}
       />
     </div>
