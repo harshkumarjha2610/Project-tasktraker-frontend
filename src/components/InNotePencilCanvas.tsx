@@ -77,13 +77,12 @@ export default function InNotePencilCanvas({
       canvas.height = height * dpr;
 
       if (ctx) {
-        ctx.scale(dpr, dpr);
         if (tempImage) {
           ctx.putImageData(tempImage, 0, 0);
         } else if (initialDataUrl) {
           const img = new Image();
           img.onload = () => {
-            ctx.drawImage(img, 0, 0, width, height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             const initialImgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             setHistory([initialImgData]);
             setHistoryStep(0);
@@ -163,9 +162,12 @@ export default function InNotePencilCanvas({
       clientY = e.clientY;
     }
 
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
+
     return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
     };
   };
 
@@ -180,6 +182,8 @@ export default function InNotePencilCanvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const dpr = window.devicePixelRatio || 1;
+
     ctx.beginPath();
     ctx.moveTo(coords.x, coords.y);
     ctx.lineTo(coords.x, coords.y);
@@ -189,17 +193,17 @@ export default function InNotePencilCanvas({
 
     if (tool === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = brushSize * 3;
+      ctx.lineWidth = brushSize * 3 * dpr;
       ctx.globalAlpha = 1.0;
     } else if (tool === 'marker') {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = brushSize * 2.5;
+      ctx.lineWidth = brushSize * 2.5 * dpr;
       ctx.globalAlpha = 0.45;
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = brushSize;
+      ctx.lineWidth = brushSize * dpr;
       ctx.globalAlpha = 1.0;
     }
 
@@ -214,6 +218,7 @@ export default function InNotePencilCanvas({
     if (!ctx || !lastPointRef.current) return;
 
     const coords = getCoords(e);
+    const dpr = window.devicePixelRatio || 1;
 
     ctx.beginPath();
     ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
@@ -224,17 +229,17 @@ export default function InNotePencilCanvas({
 
     if (tool === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = brushSize * 3;
+      ctx.lineWidth = brushSize * 3 * dpr;
       ctx.globalAlpha = 1.0;
     } else if (tool === 'marker') {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = brushSize * 2.5;
+      ctx.lineWidth = brushSize * 2.5 * dpr;
       ctx.globalAlpha = 0.45;
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = brushSize;
+      ctx.lineWidth = brushSize * dpr;
       ctx.globalAlpha = 1.0;
     }
 
