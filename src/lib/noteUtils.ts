@@ -2,6 +2,7 @@ export interface NoteTab {
   id: string;
   name: string;
   content: string;
+  pencilDataUrl?: string;
 }
 
 /**
@@ -144,6 +145,7 @@ export function parseNoteContent(rawContent: string): { tabs: NoteTab[]; plainTe
         id: t.id || String(idx + 1),
         name: t.name || `Section ${idx + 1}`,
         content: t.content || '',
+        pencilDataUrl: t.pencilDataUrl || undefined,
       }));
 
       const allPlainText = validTabs

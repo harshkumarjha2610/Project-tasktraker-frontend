@@ -9,7 +9,7 @@ import Highlight from '@tiptap/extension-highlight';
 import Image from '@tiptap/extension-image';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Extension } from '@tiptap/core';
-import { compressImageFile } from '@/lib/noteUtils';
+import { compressImageFile, NoteTab } from '@/lib/noteUtils';
 import DrawingCanvasModal from '@/components/DrawingCanvasModal';
 import InNotePencilCanvas from '@/components/InNotePencilCanvas';
 
@@ -125,11 +125,7 @@ interface NoteModalProps {
   initialData?: Note;
 }
 
-interface NoteTab {
-  id: string;
-  name: string;
-  content: string;
-}
+
 
 const COLORS = [
   { value: 'black', label: 'Pitch Black (Double Line Notebook)', hex: '#050508', accent: '#38bdf8' },
@@ -661,7 +657,15 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
     const effActiveTabId = overrides?.activeTabId !== undefined ? overrides.activeTabId : state.activeTabId;
     const effEditorHtml = overrides?.editorHtml !== undefined ? overrides.editorHtml : (editor?.getHTML() || '');
 
-    const updatedTabs = effTabs.map(t => t.id === effActiveTabId ? { ...t, content: effEditorHtml } : t);
+    const updatedTabs = effTabs.map(t => {
+      const isCurrent = t.id === effActiveTabId;
+      const pData = pencilLayerData[t.id] !== undefined ? pencilLayerData[t.id] : t.pencilDataUrl;
+      return {
+        ...t,
+        content: isCurrent ? effEditorHtml : t.content,
+        pencilDataUrl: pData,
+      };
+    });
     const serializedContent = JSON.stringify(updatedTabs);
     const targetId = state.currentNoteId;
 
@@ -786,6 +790,14 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
             setTabs(parsed);
             setActiveTabId(parsed[0].id);
             editor?.commands.setContent(parsed[0].content || '');
+
+            const initialPencilMap: Record<string, string> = {};
+            parsed.forEach((t: NoteTab) => {
+              if (t.pencilDataUrl) {
+                initialPencilMap[t.id] = t.pencilDataUrl;
+              }
+            });
+            setPencilLayerData(initialPencilMap);
           } else {
             throw new Error("Not a tab array");
           }
@@ -793,12 +805,14 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           const singleTab = { id: '1', name: 'Main', content: initialData.content || '' };
           setTabs([singleTab]);
           setActiveTabId('1');
+          setPencilLayerData({});
           editor?.commands.setContent(initialData.content || '');
         }
       } else {
         setColor('black');
         setTabs([{ id: '1', name: 'Main', content: '' }]);
         setActiveTabId('1');
+        setPencilLayerData({});
         editor?.commands.setContent('');
       }
       
@@ -835,8 +849,12 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
     
     // Save any pending changes before closing modal
     const currentContent = editor?.getHTML() || '';
-    const currentTabs = tabs.map(t => t.id === activeTabId ? { ...t, content: currentContent } : t);
-    const hasContent = currentTabs.some(t => t.content && t.content !== '<p></p>');
+    const currentTabs = tabs.map(t =>
+      t.id === activeTabId
+        ? { ...t, content: currentContent, pencilDataUrl: pencilLayerData[t.id] || t.pencilDataUrl }
+        : t
+    );
+    const hasContent = currentTabs.some(t => (t.content && t.content !== '<p></p>') || t.pencilDataUrl);
 
     if (hasContent || currentNoteId) {
       await performSave({ editorHtml: currentContent, tabs: currentTabs });
@@ -859,7 +877,11 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
     if (newTabId === activeTabId) return;
     
     const currentContent = editor?.getHTML() || '';
-    const updatedTabs = tabs.map(t => t.id === activeTabId ? { ...t, content: currentContent } : t);
+    const updatedTabs = tabs.map(t =>
+      t.id === activeTabId
+        ? { ...t, content: currentContent, pencilDataUrl: pencilLayerData[t.id] || t.pencilDataUrl }
+        : t
+    );
     setTabs(updatedTabs);
     
     const nextTab = updatedTabs.find(t => t.id === newTabId);
@@ -1342,7 +1364,15 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
               onTogglePencilMode={setIsPencilMode}
               initialDataUrl={pencilLayerData[activeTabId]}
               onChangeDataUrl={(dataUrl) => {
-                setPencilLayerData(prev => ({ ...prev, [activeTabId]: dataUrl }));
+                setPencilLayerData(prev => {
+                  const updatedMap = { ...prev, [activeTabId]: dataUrl };
+                  const updatedTabs = latestStateRef.current.tabs.map(t =>
+                    t.id === activeTabId ? { ...t, pencilDataUrl: dataUrl } : t
+                  );
+                  setTabs(updatedTabs);
+                  triggerAutoSave({ tabs: updatedTabs });
+                  return updatedMap;
+                });
               }}
               textColor={textColor}
             />

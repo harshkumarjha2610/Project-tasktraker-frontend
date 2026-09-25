@@ -266,6 +266,24 @@ export default function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
         }}
       />
 
+      {/* Pencil Handwriting Overlay Layer */}
+      {activeTab?.pencilDataUrl && (
+        <img
+          src={activeTab.pencilDataUrl}
+          alt="Pencil handwriting overlay"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: 0.9,
+            pointerEvents: 'none',
+            zIndex: 3,
+          }}
+        />
+      )}
+
       {/* Header bar with tabs & actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8, zIndex: 3 }}>
         {/* Multi-Tab Pills */}
