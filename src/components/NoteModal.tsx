@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette, Image as ImageIcon, Type } from 'lucide-react';
+import { Save, ArrowLeft, Bold, Italic, Strikethrough, Heading1, Heading2, List, ListOrdered, Maximize2, Minimize2, Highlighter, Plus, Trash2, Check, Loader2, ChevronDown, Palette, Image as ImageIcon, Type, Pencil } from 'lucide-react';
 import { Note } from '@/types/note';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -10,6 +10,7 @@ import Image from '@tiptap/extension-image';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Extension } from '@tiptap/core';
 import { compressImageFile } from '@/lib/noteUtils';
+import DrawingCanvasModal from '@/components/DrawingCanvasModal';
 
 // Custom extension for font size
 const FontSize = Extension.create({
@@ -184,7 +185,7 @@ const TEXT_COLORS = [
 ];
 
 // Toolbar Component for TipTap
-const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
+const MenuBar = ({ editor, color, onOpenDrawing }: { editor: any; color: string; onOpenDrawing: () => void }) => {
   const [activeHighlightColor, setActiveHighlightColor] = useState('#fef08a');
   const [activeTextColor, setActiveTextColor] = useState('#ef4444');
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
@@ -546,6 +547,31 @@ const MenuBar = ({ editor, color }: { editor: any, color: string }) => {
         <ImageIcon size={15} />
         <span style={{ fontSize: 11 }}>Image</span>
       </button>
+
+      <div style={{ width: 1, height: 20, background: `${color}20`, margin: '0 2px', flexShrink: 0 }} />
+
+      {/* Pencil / Freehand Drawing Tool Button */}
+      <button
+        type="button"
+        onClick={onOpenDrawing}
+        style={{
+          ...btnStyle(false),
+          gap: 5,
+          padding: '3px 10px',
+          height: 26,
+          fontSize: 12,
+          fontWeight: 700,
+          background: 'linear-gradient(135deg, rgba(56,189,248,0.22), rgba(139,92,246,0.22))',
+          border: '1px solid rgba(56,189,248,0.4)',
+          color: '#38bdf8',
+          borderRadius: 8,
+          boxShadow: '0 2px 8px rgba(56,189,248,0.15)',
+        }}
+        title="✏️ Draw & sketch anything with Pencil (Freehand Canvas Studio)"
+      >
+        <Pencil size={15} />
+        <span style={{ fontSize: 11 }}>Pencil / Draw</span>
+      </button>
     </div>
   );
 };
@@ -556,6 +582,8 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
   const [tabs, setTabs] = useState<NoteTab[]>([{ id: '1', name: 'Main', content: '' }]);
   const [activeTabId, setActiveTabId] = useState<string>('1');
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
+
+  const [showDrawingCanvas, setShowDrawingCanvas] = useState(false);
 
   const [currentNoteId, setCurrentNoteId] = useState<string | undefined>(undefined);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
@@ -1118,7 +1146,7 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
             </div>
           </div>
 
-          <MenuBar editor={editor} color={textColor} />
+          <MenuBar editor={editor} color={textColor} onOpenDrawing={() => setShowDrawingCanvas(true)} />
           
           {/* Tabs Bar */}
           <div style={{
@@ -1272,6 +1300,19 @@ export default function NoteModal({ open, onClose, onSave, initialData }: NoteMo
           </div>
         </form>
       </div>
+
+      {/* Freehand Pencil Drawing Studio Modal */}
+      <DrawingCanvasModal
+        open={showDrawingCanvas}
+        onClose={() => setShowDrawingCanvas(false)}
+        onSaveDrawing={(dataUrl) => {
+          if (editor) {
+            editor.chain().focus().setImage({ src: dataUrl }).run();
+            triggerAutoSave({ editorHtml: editor.getHTML() });
+          }
+        }}
+        colorTheme={textColor}
+      />
     </div>
   );
 }
