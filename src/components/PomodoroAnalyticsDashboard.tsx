@@ -8,7 +8,8 @@ import {
 import {
   TrendingUp, Clock, Award, AlertTriangle, Calendar, ChevronLeft, ChevronRight,
   CheckCircle2, Target, Zap, Sparkles, BrainCircuit, Flame, ShieldAlert,
-  PieChart as PieChartIcon, BarChart3, RotateCcw, Filter, Activity, CheckSquare
+  PieChart as PieChartIcon, BarChart3, RotateCcw, Filter, Activity, CheckSquare,
+  Trophy, Sliders, ArrowUpRight, ArrowDownRight, Compass
 } from 'lucide-react';
 import { PomodoroSession, WastedSessionRecord } from '@/context/PomodoroContext';
 
@@ -164,9 +165,11 @@ export default function PomodoroAnalyticsDashboard({
     };
   }, [history, wasteHistory, selectedDateKey]);
 
-  // 2. Past 7 Days Trend Data for Charts
+  // 2. Past 7 Days Day-Wise Patterns Analysis & Trend Data
   const past7DaysData = useMemo(() => {
     const list = [];
+    let maxFocusMins = 0;
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -182,21 +185,98 @@ export default function PomodoroAnalyticsDashboard({
       const totalSecs = (focusMins * 60) + wasteSecs;
       const score = totalSecs > 0 ? Math.round(((focusMins * 60) / totalSecs) * 100) : (dSessions.length > 0 ? 100 : 0);
 
-      const dayLabel = d.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric' });
+      const dayName = d.toLocaleDateString([], { weekday: 'long' });
+      const dayShort = d.toLocaleDateString([], { weekday: 'short' });
+      const dateFormatted = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+      if (focusMins > maxFocusMins) maxFocusMins = focusMins;
 
       list.push({
         dateKey: key,
-        dayLabel,
+        dayName,
+        dayShort,
+        dateFormatted,
+        dayLabel: `${dayShort} (${dateFormatted})`,
+        focusMins,
+        wasteMins,
         'Focus (mins)': focusMins,
         'Wasted (mins)': wasteMins,
+        pomodoros: dSessions.length,
         'Pomodoros': dSessions.length,
         'Efficiency %': score,
+        efficiencyScore: score,
       });
     }
-    return list;
+
+    return list.map(item => ({
+      ...item,
+      ratioToPeak: maxFocusMins > 0 ? Math.round((item.focusMins / maxFocusMins) * 100) : 0,
+    }));
   }, [history, wasteHistory]);
 
-  // 3. Task Distribution Pie Chart Data
+  // 3. Most Productive Day vs Least Productive Day & Weekday Patterns
+  const patternAnalysis = useMemo(() => {
+    // Map all recorded date keys to daily metrics
+    const dateMap: Record<string, { dateKey: string; focusMins: number; wasteMins: number; pomodoros: number; score: number }> = {};
+
+    history.filter(s => s.mode === 'work').forEach(s => {
+      const key = getLocalDateKey(s.completedAt);
+      if (!key) return;
+      if (!dateMap[key]) {
+        dateMap[key] = { dateKey: key, focusMins: 0, wasteMins: 0, pomodoros: 0, score: 0 };
+      }
+      dateMap[key].focusMins += s.durationMinutes;
+      dateMap[key].pomodoros += 1;
+    });
+
+    wasteHistory.forEach(w => {
+      const key = getLocalDateKey(w.interruptedAt);
+      if (!key) return;
+      if (!dateMap[key]) {
+        dateMap[key] = { dateKey: key, focusMins: 0, wasteMins: 0, pomodoros: 0, score: 0 };
+      }
+      dateMap[key].wasteMins += Math.round(w.durationSeconds / 60);
+    });
+
+    const allDays = Object.values(dateMap).map(d => {
+      const totalSecs = (d.focusMins * 60) + (d.wasteMins * 60);
+      const score = totalSecs > 0 ? Math.round(((d.focusMins * 60) / totalSecs) * 100) : (d.focusMins > 0 ? 100 : 0);
+      return { ...d, score };
+    }).sort((a, b) => b.focusMins - a.focusMins);
+
+    // Most productive day (highest focusMins)
+    const mostProductiveDay = allDays.length > 0 ? allDays[0] : null;
+
+    // Least productive day among active focus days (lowest focusMins > 0)
+    const activeDaysAsc = [...allDays].filter(d => d.focusMins > 0).sort((a, b) => a.focusMins - b.focusMins);
+    const leastProductiveDay = activeDaysAsc.length > 0 ? activeDaysAsc[0] : (allDays.length > 0 ? allDays[allDays.length - 1] : null);
+
+    const totalFocusAllDays = allDays.reduce((sum, d) => sum + d.focusMins, 0);
+    const avgFocusMinsPerDay = allDays.length > 0 ? Math.round(totalFocusAllDays / allDays.length) : 0;
+
+    // Weekday averages (Sunday = 0, Monday = 1, ..., Saturday = 6)
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const weekdayStats = weekdayNames.map((name, idx) => {
+      const matchingDays = allDays.filter(d => new Date(d.dateKey + 'T00:00:00').getDay() === idx);
+      const totalMins = matchingDays.reduce((sum, d) => sum + d.focusMins, 0);
+      const avgMins = matchingDays.length > 0 ? Math.round(totalMins / matchingDays.length) : 0;
+      const totalPoms = matchingDays.reduce((sum, d) => sum + d.pomodoros, 0);
+      return { day: name, shortDay: name.slice(0, 3), avgMins, totalMins, daysLogged: matchingDays.length, totalPoms };
+    });
+
+    const bestWeekday = [...weekdayStats].sort((a, b) => b.avgMins - a.avgMins)[0];
+
+    return {
+      allDays,
+      mostProductiveDay,
+      leastProductiveDay,
+      avgFocusMinsPerDay,
+      weekdayStats,
+      bestWeekday,
+    };
+  }, [history, wasteHistory]);
+
+  // 4. Task Distribution Pie Chart Data
   const taskPieData = useMemo(() => {
     if (selectedPreset === 'all' || selectedPreset === 'past7' || selectedPreset === 'past30') {
       const filteredHist = history.filter(s => s.mode === 'work');
@@ -341,6 +421,201 @@ export default function PomodoroAnalyticsDashboard({
         </div>
       </div>
 
+      {/* ── 🏆 Most Productive Day vs 😴 Least Productive Day Highlights Banner ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: 16
+      }}>
+        {/* Most Productive Day Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(234, 88, 12, 0.08))',
+          borderRadius: 20,
+          border: '1px solid rgba(245, 158, 11, 0.4)',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(245, 158, 11, 0.15)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 12,
+                background: 'linear-gradient(135deg, #f59e0b, #ea580c)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
+              }}>
+                <Trophy size={20} color="#ffffff" />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#f59e0b', letterSpacing: 0.5 }}>
+                  🏆 Most Productive Day
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
+                  {patternAnalysis.mostProductiveDay
+                    ? formatDateHumanReadable(patternAnalysis.mostProductiveDay.dateKey)
+                    : 'No sessions logged yet'}
+                </div>
+              </div>
+            </div>
+            {patternAnalysis.mostProductiveDay && (
+              <button
+                onClick={() => handleSelectDate(patternAnalysis.mostProductiveDay!.dateKey)}
+                style={{
+                  padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                  background: 'rgba(245, 158, 11, 0.2)', border: '1px solid rgba(245, 158, 11, 0.4)',
+                  color: '#f59e0b', cursor: 'pointer'
+                }}
+                title="Jump to this date"
+              >
+                View Date →
+              </button>
+            )}
+          </div>
+
+          {patternAnalysis.mostProductiveDay ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid rgba(245,158,11,0.2)' }}>
+              <div>
+                <span style={{ fontSize: 26, fontWeight: 800, color: '#f59e0b' }}>
+                  {patternAnalysis.mostProductiveDay.focusMins >= 60
+                    ? `${(patternAnalysis.mostProductiveDay.focusMins / 60).toFixed(1)} hrs`
+                    : `${patternAnalysis.mostProductiveDay.focusMins} mins`}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 6 }}>
+                  ({patternAnalysis.mostProductiveDay.focusMins} focus mins)
+                </span>
+              </div>
+              <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <div>🍅 {patternAnalysis.mostProductiveDay.pomodoros} Pomodoros</div>
+                <div style={{ color: '#10b981', fontWeight: 700 }}>{patternAnalysis.mostProductiveDay.score}% Efficiency</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete Pomodoro sessions to unlock your peak productive day!</div>
+          )}
+        </div>
+
+        {/* Least Productive Day Card */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(245, 158, 11, 0.05))',
+          borderRadius: 20,
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 12,
+                background: 'rgba(239, 68, 68, 0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <ShieldAlert size={20} color="#ef4444" />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#ef4444', letterSpacing: 0.5 }}>
+                  😴 Lowest Focus Active Day
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
+                  {patternAnalysis.leastProductiveDay
+                    ? formatDateHumanReadable(patternAnalysis.leastProductiveDay.dateKey)
+                    : 'No sessions logged'}
+                </div>
+              </div>
+            </div>
+            {patternAnalysis.leastProductiveDay && (
+              <button
+                onClick={() => handleSelectDate(patternAnalysis.leastProductiveDay!.dateKey)}
+                style={{
+                  padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                  background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#ef4444', cursor: 'pointer'
+                }}
+                title="Jump to this date"
+              >
+                View Date →
+              </button>
+            )}
+          </div>
+
+          {patternAnalysis.leastProductiveDay ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid rgba(239,68,68,0.2)' }}>
+              <div>
+                <span style={{ fontSize: 26, fontWeight: 800, color: '#ef4444' }}>
+                  {patternAnalysis.leastProductiveDay.focusMins >= 60
+                    ? `${(patternAnalysis.leastProductiveDay.focusMins / 60).toFixed(1)} hrs`
+                    : `${patternAnalysis.leastProductiveDay.focusMins} mins`}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 6 }}>
+                  ({patternAnalysis.leastProductiveDay.focusMins} focus mins)
+                </span>
+              </div>
+              <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <div>🍅 {patternAnalysis.leastProductiveDay.pomodoros} Pomodoro</div>
+                <div style={{ color: '#ef4444' }}>-{patternAnalysis.leastProductiveDay.wasteMins} mins waste</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No low activity days recorded.</div>
+          )}
+        </div>
+
+        {/* Daily Focus Average Card */}
+        <div style={{
+          background: 'var(--bg-card)',
+          borderRadius: 20,
+          border: '1px solid var(--border)',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 12,
+              background: 'rgba(6, 186, 212, 0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Compass size={20} color="#06b6d4" />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#06b6d4', letterSpacing: 0.5 }}>
+                📊 Daily Average Focus
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
+                Across {patternAnalysis.allDays.length} Active Logged Days
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+            <div>
+              <span style={{ fontSize: 26, fontWeight: 800, color: '#06b6d4' }}>
+                {patternAnalysis.avgFocusMinsPerDay >= 60
+                  ? `${(patternAnalysis.avgFocusMinsPerDay / 60).toFixed(1)} hrs`
+                  : `${patternAnalysis.avgFocusMinsPerDay} mins`}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 6 }}>
+                / day avg
+              </span>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <div>Best Weekday:</div>
+              <div style={{ color: 'var(--accent)', fontWeight: 700 }}>
+                {patternAnalysis.bestWeekday?.day} ({patternAnalysis.bestWeekday?.avgMins} mins)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── Active Day Banner & AI Narrative Summary ──────────────── */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(6, 186, 212, 0.08))',
@@ -356,7 +631,7 @@ export default function PomodoroAnalyticsDashboard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Calendar size={20} color="#8b5cf6" />
             <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-              {formatDateHumanReadable(selectedDateKey)}
+              Selected Day: {formatDateHumanReadable(selectedDateKey)}
             </h3>
           </div>
 
@@ -393,6 +668,118 @@ export default function PomodoroAnalyticsDashboard({
         }}>
           <Sparkles size={20} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} />
           <div>{generateExperienceNarrative()}</div>
+        </div>
+      </div>
+
+      {/* ── 📅 PREVIOUS 7 DAYS DAY-WISE PATTERNS CARDS ───────────── */}
+      <div style={{
+        background: 'var(--bg-card)',
+        borderRadius: 20,
+        border: '1px solid var(--border)',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Flame size={20} color="#f59e0b" />
+            <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+              Previous 7 Days Day-Wise Focus Patterns
+            </h3>
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Click any day card to view its full detailed analytics &amp; timeline
+          </span>
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
+          gap: 12
+        }}>
+          {past7DaysData.map(day => {
+            const isSelected = selectedDateKey === day.dateKey;
+            let statusBadge = '☕ Light';
+            let badgeColor = 'var(--text-muted)';
+            let badgeBg = 'rgba(255,255,255,0.06)';
+
+            if (day.focusMins >= 180) {
+              statusBadge = '🏆 Peak Day';
+              badgeColor = '#f59e0b';
+              badgeBg = 'rgba(245, 158, 11, 0.15)';
+            } else if (day.focusMins >= 90) {
+              statusBadge = '⚡ High Flow';
+              badgeColor = '#8b5cf6';
+              badgeBg = 'rgba(139, 92, 246, 0.15)';
+            } else if (day.focusMins >= 30) {
+              statusBadge = '⚖️ Moderate';
+              badgeColor = '#06b6d4';
+              badgeBg = 'rgba(6, 186, 212, 0.15)';
+            }
+
+            return (
+              <button
+                key={day.dateKey}
+                onClick={() => handleSelectDate(day.dateKey)}
+                style={{
+                  background: isSelected ? 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(6,186,212,0.15))' : 'var(--bg-secondary)',
+                  borderRadius: 16,
+                  border: isSelected ? '2px solid var(--accent)' : '1px solid var(--border)',
+                  padding: '14px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.2s ease',
+                  transform: isSelected ? 'translateY(-2px)' : 'none',
+                  boxShadow: isSelected ? '0 8px 20px rgba(139, 92, 246, 0.25)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: isSelected ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                    {day.dayShort}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                    {day.dateFormatted}
+                  </span>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {day.focusMins} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>mins</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                    🍅 {day.pomodoros} Pomodoro{day.pomodoros === 1 ? '' : 's'}
+                  </div>
+                </div>
+
+                {/* Focus Intensity Bar */}
+                <div style={{ height: 5, width: '100%', borderRadius: 10, background: 'var(--bg-card)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${day.ratioToPeak}%`,
+                    background: isSelected ? 'var(--accent)' : day.focusMins >= 180 ? '#f59e0b' : day.focusMins >= 90 ? '#8b5cf6' : '#06b6d4',
+                    borderRadius: 10,
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+
+                <div style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: 6,
+                  background: badgeBg,
+                  color: badgeColor,
+                  alignSelf: 'flex-start'
+                }}>
+                  {statusBadge}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -546,10 +933,10 @@ export default function PomodoroAnalyticsDashboard({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <TrendingUp size={18} color="#8b5cf6" />
               <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Past 7 Days Focus &amp; Waste Trend
+                Past 7 Days Focus &amp; Waste Trend (Minutes)
               </h4>
             </div>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Minutes per day</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Focus vs Waste</span>
           </div>
 
           <div style={{ width: '100%', height: 260 }}>
@@ -584,7 +971,7 @@ export default function PomodoroAnalyticsDashboard({
           </div>
         </div>
 
-        {/* Chart 2: Task Focus Time Allocation (Donut Chart) */}
+        {/* Chart 2: Weekday Historical Focus Averages (Mon - Sun Pattern) */}
         <div style={{
           background: 'var(--bg-card)',
           borderRadius: 20,
@@ -596,9 +983,59 @@ export default function PomodoroAnalyticsDashboard({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <PieChartIcon size={18} color="#06b6d4" />
+              <BarChart3 size={18} color="#06b6d4" />
               <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Task Focus Distribution
+                Weekday Productivity Patterns (Avg Minutes)
+              </h4>
+            </div>
+            <span style={{ fontSize: 11, color: '#06b6d4', fontWeight: 600 }}>
+              Best: {patternAnalysis.bestWeekday?.day} ({patternAnalysis.bestWeekday?.avgMins}m avg)
+            </span>
+          </div>
+
+          <div style={{ width: '100%', height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={patternAnalysis.weekdayStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <XAxis dataKey="shortDay" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
+                <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: '#1c1c28',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 10,
+                    color: '#f0f0ff',
+                    fontSize: 12
+                  }}
+                  formatter={(val: any) => [`${val} mins avg`, 'Focus Time']}
+                />
+                <Bar dataKey="avgMins" fill="#06b6d4" radius={[6, 6, 0, 0]}>
+                  {patternAnalysis.weekdayStats.map((entry, index) => (
+                    <Cell
+                      key={`cell-w-${index}`}
+                      fill={entry.day === patternAnalysis.bestWeekday?.day ? '#f59e0b' : '#06b6d4'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Chart 3: Task Focus Time Allocation (Donut Chart) */}
+        <div style={{
+          background: 'var(--bg-card)',
+          borderRadius: 20,
+          border: '1px solid var(--border)',
+          padding: '20px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <PieChartIcon size={18} color="#ec4899" />
+              <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                Task Focus Distribution (Minutes)
               </h4>
             </div>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Focus duration by task</span>
@@ -642,7 +1079,7 @@ export default function PomodoroAnalyticsDashboard({
           )}
         </div>
 
-        {/* Chart 3: 24-Hour Peak Productivity Heatmap / Bar Chart */}
+        {/* Chart 4: 24-Hour Peak Productivity Heatmap / Bar Chart */}
         <div style={{
           background: 'var(--bg-card)',
           borderRadius: 20,
@@ -683,7 +1120,7 @@ export default function PomodoroAnalyticsDashboard({
           </div>
         </div>
 
-        {/* Chart 4: Past 7 Days Efficiency Score Trend */}
+        {/* Chart 5: Past 7 Days Efficiency Score Trend */}
         <div style={{
           background: 'var(--bg-card)',
           borderRadius: 20,
