@@ -9,7 +9,7 @@ import {
   TrendingUp, Clock, Award, AlertTriangle, Calendar, ChevronLeft, ChevronRight,
   CheckCircle2, Target, Zap, Sparkles, BrainCircuit, Flame, ShieldAlert,
   PieChart as PieChartIcon, BarChart3, RotateCcw, Filter, Activity, CheckSquare,
-  Trophy, Sliders, ArrowUpRight, ArrowDownRight, Compass
+  Trophy, Sliders, ArrowUpRight, ArrowDownRight, Compass, SkipBack, SkipForward
 } from 'lucide-react';
 import { PomodoroSession, WastedSessionRecord } from '@/context/PomodoroContext';
 
@@ -55,6 +55,7 @@ export default function PomodoroAnalyticsDashboard({
 }: PomodoroAnalyticsDashboardProps) {
   const [selectedPreset, setSelectedPreset] = useState<DatePreset>('today');
   const [selectedDateKey, setSelectedDateKey] = useState<string>(getLocalDateKey(new Date()));
+  const [weekOffset, setWeekOffset] = useState<number>(0); // 0 = Current Week, -1 = Previous Week, -2 = 2 Weeks Ago, etc.
 
   const handleSelectDate = (dateKey: string) => {
     setSelectedDateKey(dateKey);
@@ -71,6 +72,7 @@ export default function PomodoroAnalyticsDashboard({
     const today = new Date();
     if (preset === 'today') {
       setSelectedDateKey(getLocalDateKey(today));
+      setWeekOffset(0);
     } else if (preset === 'yesterday') {
       setSelectedDateKey(getLocalDateKey(Date.now() - 86400000));
     }
@@ -165,14 +167,22 @@ export default function PomodoroAnalyticsDashboard({
     };
   }, [history, wasteHistory, selectedDateKey]);
 
-  // 2. Past 7 Days Day-Wise Patterns Analysis & Trend Data
-  const past7DaysData = useMemo(() => {
-    const list = [];
+  // 2. Week Slider & Combined Whole Week Analysis (supports sliding back to previous weeks)
+  const selectedWeekDetails = useMemo(() => {
+    const now = new Date();
+    const currentDayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const distToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+    
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + distToMonday + (weekOffset * 7));
+    monday.setHours(0, 0, 0, 0);
+
+    const days = [];
     let maxFocusMins = 0;
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
       const key = getLocalDateKey(d);
 
       const dSessions = history.filter(s => getLocalDateKey(s.completedAt) === key && s.mode === 'work');
@@ -191,7 +201,7 @@ export default function PomodoroAnalyticsDashboard({
 
       if (focusMins > maxFocusMins) maxFocusMins = focusMins;
 
-      list.push({
+      days.push({
         dateKey: key,
         dayName,
         dayShort,
@@ -208,11 +218,48 @@ export default function PomodoroAnalyticsDashboard({
       });
     }
 
-    return list.map(item => ({
+    const daysWithRatio = days.map(item => ({
       ...item,
       ratioToPeak: maxFocusMins > 0 ? Math.round((item.focusMins / maxFocusMins) * 100) : 0,
     }));
-  }, [history, wasteHistory]);
+
+    // Combined Whole Week Statistics
+    const totalWeeklyFocusMins = days.reduce((sum, d) => sum + d.focusMins, 0);
+    const totalWeeklyWasteMins = days.reduce((sum, d) => sum + d.wasteMins, 0);
+    const totalWeeklyPomodoros = days.reduce((sum, d) => sum + d.pomodoros, 0);
+
+    const weeklyHours = Math.floor(totalWeeklyFocusMins / 60);
+    const weeklyMins = totalWeeklyFocusMins % 60;
+    const formattedWeeklyTime = weeklyHours > 0 
+      ? `${weeklyHours} hrs ${weeklyMins} mins` 
+      : `${weeklyMins} mins`;
+
+    const totalWeeklySecs = (totalWeeklyFocusMins * 60) + (totalWeeklyWasteMins * 60);
+    const weeklyEfficiency = totalWeeklySecs > 0 
+      ? Math.round(((totalWeeklyFocusMins * 60) / totalWeeklySecs) * 100) 
+      : (totalWeeklyFocusMins > 0 ? 100 : 0);
+
+    const sunday = days[6];
+    const startDateStr = monday.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    const endDateStr = new Date(sunday.dateKey + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+    let weekLabel = `${startDateStr} — ${endDateStr}`;
+    if (weekOffset === 0) weekLabel += ' (Current Week)';
+    else if (weekOffset === -1) weekLabel += ' (Previous Week)';
+    else if (weekOffset < -1) weekLabel += ` (${Math.abs(weekOffset)} Weeks Ago)`;
+
+    return {
+      monday,
+      sunday,
+      weekDays: daysWithRatio,
+      totalWeeklyFocusMins,
+      totalWeeklyWasteMins,
+      totalWeeklyPomodoros,
+      formattedWeeklyTime,
+      weeklyEfficiency,
+      weekLabel,
+    };
+  }, [history, wasteHistory, weekOffset]);
 
   // 3. Most Productive Day vs Least Productive Day & Weekday Patterns
   const patternAnalysis = useMemo(() => {
@@ -616,6 +663,262 @@ export default function PomodoroAnalyticsDashboard({
         </div>
       </div>
 
+      {/* ── 🗓️ WEEK SLIDER & COMBINED WHOLE WEEK SUMMARY BANNER ───────── */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.14), rgba(16, 185, 129, 0.1))',
+        borderRadius: 22,
+        border: '1px solid rgba(139, 92, 246, 0.35)',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+        boxShadow: '0 10px 30px rgba(0,0,0,0.15)'
+      }}>
+        {/* Week Slider Stepper Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Calendar size={22} color="#8b5cf6" />
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#8b5cf6', letterSpacing: 0.5 }}>
+                Week-by-Week Focus History
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>
+                {selectedWeekDetails.weekLabel}
+              </div>
+            </div>
+          </div>
+
+          {/* Week Stepper Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setWeekOffset(weekOffset - 1)}
+              style={{
+                padding: '7px 14px',
+                borderRadius: 12,
+                fontSize: 12,
+                fontWeight: 700,
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s ease'
+              }}
+              title="Slide to Previous Week"
+            >
+              <ChevronLeft size={16} />
+              <span>Previous Week</span>
+            </button>
+
+            {weekOffset !== 0 && (
+              <button
+                onClick={() => setWeekOffset(0)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 12,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  background: 'rgba(139, 92, 246, 0.2)',
+                  border: '1px solid rgba(139, 92, 246, 0.4)',
+                  color: '#8b5cf6',
+                  cursor: 'pointer'
+                }}
+                title="Reset to Current Week"
+              >
+                Current Week
+              </button>
+            )}
+
+            <button
+              onClick={() => setWeekOffset(weekOffset + 1)}
+              disabled={weekOffset >= 0}
+              style={{
+                padding: '7px 14px',
+                borderRadius: 12,
+                fontSize: 12,
+                fontWeight: 700,
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                color: weekOffset >= 0 ? 'var(--text-muted)' : 'var(--text-primary)',
+                cursor: weekOffset >= 0 ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                opacity: weekOffset >= 0 ? 0.4 : 1,
+                transition: 'all 0.2s ease'
+              }}
+              title="Slide to Next Week"
+            >
+              <span>Next Week</span>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* COMBINED WHOLE WEEK METRICS HIGHLIGHT GRID */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 14,
+          background: 'var(--bg-card)',
+          padding: '16px 20px',
+          borderRadius: 16,
+          border: '1px solid var(--border)'
+        }}>
+          {/* Total Combined Focus Time for Whole Week */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              ⏱️ Combined Weekly Focus Time
+            </span>
+            <span style={{ fontSize: 24, fontWeight: 800, color: '#8b5cf6' }}>
+              {selectedWeekDetails.formattedWeeklyTime}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              ({selectedWeekDetails.totalWeeklyFocusMins} focus mins total)
+            </span>
+          </div>
+
+          {/* Weekly Completed Sessions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              🍅 Weekly Pomodoro Count
+            </span>
+            <span style={{ fontSize: 24, fontWeight: 800, color: '#06b6d4' }}>
+              {selectedWeekDetails.totalWeeklyPomodoros} Sessions
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              Completed in this week
+            </span>
+          </div>
+
+          {/* Weekly Wasted Time */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              🚨 Weekly Interrupted Time
+            </span>
+            <span style={{ fontSize: 24, fontWeight: 800, color: '#ef4444' }}>
+              {selectedWeekDetails.totalWeeklyWasteMins >= 60
+                ? `${(selectedWeekDetails.totalWeeklyWasteMins / 60).toFixed(1)} hrs`
+                : `${selectedWeekDetails.totalWeeklyWasteMins} mins`}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              Logged delay &amp; waste
+            </span>
+          </div>
+
+          {/* Weekly Flow Efficiency */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+              ⚡ Combined Weekly Efficiency
+            </span>
+            <span style={{ fontSize: 24, fontWeight: 800, color: '#10b981' }}>
+              {selectedWeekDetails.weeklyEfficiency}%
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              Weekly Focus vs Waste ratio
+            </span>
+          </div>
+        </div>
+
+        {/* 📅 DAY-WISE PATTERN CARDS FOR THE SELECTED WEEK */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
+            Day-Wise Patterns for {selectedWeekDetails.weekLabel}:
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+            gap: 12
+          }}>
+            {selectedWeekDetails.weekDays.map(day => {
+              const isSelected = selectedDateKey === day.dateKey;
+              let statusBadge = '☕ Light';
+              let badgeColor = 'var(--text-muted)';
+              let badgeBg = 'rgba(255,255,255,0.06)';
+
+              if (day.focusMins >= 180) {
+                statusBadge = '🏆 Peak Day';
+                badgeColor = '#f59e0b';
+                badgeBg = 'rgba(245, 158, 11, 0.15)';
+              } else if (day.focusMins >= 90) {
+                statusBadge = '⚡ High Flow';
+                badgeColor = '#8b5cf6';
+                badgeBg = 'rgba(139, 92, 246, 0.15)';
+              } else if (day.focusMins >= 30) {
+                statusBadge = '⚖️ Moderate';
+                badgeColor = '#06b6d4';
+                badgeBg = 'rgba(6, 186, 212, 0.15)';
+              }
+
+              return (
+                <button
+                  key={day.dateKey}
+                  onClick={() => handleSelectDate(day.dateKey)}
+                  style={{
+                    background: isSelected ? 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(6,186,212,0.15))' : 'var(--bg-secondary)',
+                    borderRadius: 16,
+                    border: isSelected ? '2px solid var(--accent)' : '1px solid var(--border)',
+                    padding: '14px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s ease',
+                    transform: isSelected ? 'translateY(-2px)' : 'none',
+                    boxShadow: isSelected ? '0 8px 20px rgba(139, 92, 246, 0.25)' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: isSelected ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                      {day.dayShort}
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                      {day.dateFormatted}
+                    </span>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {day.focusMins} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>mins</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                      🍅 {day.pomodoros} Pomodoro{day.pomodoros === 1 ? '' : 's'}
+                    </div>
+                  </div>
+
+                  {/* Focus Intensity Bar */}
+                  <div style={{ height: 5, width: '100%', borderRadius: 10, background: 'var(--bg-card)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${day.ratioToPeak}%`,
+                      background: isSelected ? 'var(--accent)' : day.focusMins >= 180 ? '#f59e0b' : day.focusMins >= 90 ? '#8b5cf6' : '#06b6d4',
+                      borderRadius: 10,
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+
+                  <div style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: 6,
+                    background: badgeBg,
+                    color: badgeColor,
+                    alignSelf: 'flex-start'
+                  }}>
+                    {statusBadge}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* ── Active Day Banner & AI Narrative Summary ──────────────── */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(6, 186, 212, 0.08))',
@@ -668,118 +971,6 @@ export default function PomodoroAnalyticsDashboard({
         }}>
           <Sparkles size={20} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} />
           <div>{generateExperienceNarrative()}</div>
-        </div>
-      </div>
-
-      {/* ── 📅 PREVIOUS 7 DAYS DAY-WISE PATTERNS CARDS ───────────── */}
-      <div style={{
-        background: 'var(--bg-card)',
-        borderRadius: 20,
-        border: '1px solid var(--border)',
-        padding: '24px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Flame size={20} color="#f59e0b" />
-            <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-              Previous 7 Days Day-Wise Focus Patterns
-            </h3>
-          </div>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            Click any day card to view its full detailed analytics &amp; timeline
-          </span>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
-          gap: 12
-        }}>
-          {past7DaysData.map(day => {
-            const isSelected = selectedDateKey === day.dateKey;
-            let statusBadge = '☕ Light';
-            let badgeColor = 'var(--text-muted)';
-            let badgeBg = 'rgba(255,255,255,0.06)';
-
-            if (day.focusMins >= 180) {
-              statusBadge = '🏆 Peak Day';
-              badgeColor = '#f59e0b';
-              badgeBg = 'rgba(245, 158, 11, 0.15)';
-            } else if (day.focusMins >= 90) {
-              statusBadge = '⚡ High Flow';
-              badgeColor = '#8b5cf6';
-              badgeBg = 'rgba(139, 92, 246, 0.15)';
-            } else if (day.focusMins >= 30) {
-              statusBadge = '⚖️ Moderate';
-              badgeColor = '#06b6d4';
-              badgeBg = 'rgba(6, 186, 212, 0.15)';
-            }
-
-            return (
-              <button
-                key={day.dateKey}
-                onClick={() => handleSelectDate(day.dateKey)}
-                style={{
-                  background: isSelected ? 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(6,186,212,0.15))' : 'var(--bg-secondary)',
-                  borderRadius: 16,
-                  border: isSelected ? '2px solid var(--accent)' : '1px solid var(--border)',
-                  padding: '14px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease',
-                  transform: isSelected ? 'translateY(-2px)' : 'none',
-                  boxShadow: isSelected ? '0 8px 20px rgba(139, 92, 246, 0.25)' : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: isSelected ? 'var(--accent)' : 'var(--text-secondary)' }}>
-                    {day.dayShort}
-                  </span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                    {day.dateFormatted}
-                  </span>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>
-                    {day.focusMins} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>mins</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                    🍅 {day.pomodoros} Pomodoro{day.pomodoros === 1 ? '' : 's'}
-                  </div>
-                </div>
-
-                {/* Focus Intensity Bar */}
-                <div style={{ height: 5, width: '100%', borderRadius: 10, background: 'var(--bg-card)', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${day.ratioToPeak}%`,
-                    background: isSelected ? 'var(--accent)' : day.focusMins >= 180 ? '#f59e0b' : day.focusMins >= 90 ? '#8b5cf6' : '#06b6d4',
-                    borderRadius: 10,
-                    transition: 'width 0.3s ease'
-                  }} />
-                </div>
-
-                <div style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: '2px 6px',
-                  borderRadius: 6,
-                  background: badgeBg,
-                  color: badgeColor,
-                  alignSelf: 'flex-start'
-                }}>
-                  {statusBadge}
-                </div>
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -919,7 +1110,7 @@ export default function PomodoroAnalyticsDashboard({
       {/* ── Graphical Charts Section ─────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 20 }}>
 
-        {/* Chart 1: 7-Day Focus vs Wasted Minutes Trend */}
+        {/* Chart 1: Week Focus vs Wasted Minutes Trend */}
         <div style={{
           background: 'var(--bg-card)',
           borderRadius: 20,
@@ -933,7 +1124,7 @@ export default function PomodoroAnalyticsDashboard({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <TrendingUp size={18} color="#8b5cf6" />
               <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Past 7 Days Focus &amp; Waste Trend (Minutes)
+                Weekly Focus &amp; Waste Trend ({selectedWeekDetails.weekLabel})
               </h4>
             </div>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Focus vs Waste</span>
@@ -941,7 +1132,7 @@ export default function PomodoroAnalyticsDashboard({
 
           <div style={{ width: '100%', height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={past7DaysData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={selectedWeekDetails.weekDays} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="focusGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
@@ -1120,7 +1311,7 @@ export default function PomodoroAnalyticsDashboard({
           </div>
         </div>
 
-        {/* Chart 5: Past 7 Days Efficiency Score Trend */}
+        {/* Chart 5: Week Efficiency Score Trend */}
         <div style={{
           background: 'var(--bg-card)',
           borderRadius: 20,
@@ -1134,7 +1325,7 @@ export default function PomodoroAnalyticsDashboard({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Zap size={18} color="#10b981" />
               <h4 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Daily Productivity Efficiency % Trend
+                Weekly Efficiency % Trend ({selectedWeekDetails.weekLabel})
               </h4>
             </div>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Target: 80%+</span>
@@ -1142,7 +1333,7 @@ export default function PomodoroAnalyticsDashboard({
 
           <div style={{ width: '100%', height: 240 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={past7DaysData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart data={selectedWeekDetails.weekDays} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <XAxis dataKey="dayLabel" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
                 <YAxis stroke="var(--text-muted)" fontSize={11} domain={[0, 100]} tickLine={false} />
                 <Tooltip
