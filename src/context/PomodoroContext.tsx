@@ -157,13 +157,39 @@ export const MOTIVATIONAL_QUOTES = [
   "Turn off distraction. Turn on flow state."
 ];
 
+let sharedAudioContext: AudioContext | null = null;
+
+export const getSharedAudioContext = (): AudioContext | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    if (!sharedAudioContext) {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        sharedAudioContext = new AudioCtx();
+      }
+    }
+    if (sharedAudioContext && sharedAudioContext.state === 'suspended') {
+      sharedAudioContext.resume().catch(() => {});
+    }
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+};
+
+export const unlockAudioContext = () => {
+  const ctx = getSharedAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+};
+
 // Web Audio API Clock Ticking Synthesizer
 export const playClockTickStyle = (style: ClockSoundStyle, isTock: boolean, volume = 0.08) => {
   if (typeof window === 'undefined') return;
   try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = getSharedAudioContext();
+    if (!ctx || ctx.state === 'suspended') return;
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -247,41 +273,51 @@ export const playClockTickStyle = (style: ClockSoundStyle, isTock: boolean, volu
 export const playTransitionBell = (transition: 'focus_to_break' | 'break_to_focus') => {
   if (typeof window === 'undefined') return;
   try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
     const baseFreq = transition === 'focus_to_break' ? 528 : 432;
-    const harmonics = [baseFreq, baseFreq * 2, baseFreq * 3.01, baseFreq * 4.2];
+    // 3 Bell Strikes sequence: DING (0s) ... DING (0.6s) ... DING (1.2s)!
+    const strikes = [0, 0.6, 1.2];
 
-    harmonics.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+    strikes.forEach((delay) => {
+      const startTime = ctx.currentTime + delay;
+      const harmonics = [baseFreq, baseFreq * 2.01, baseFreq * 3.01, baseFreq * 4.25, baseFreq * 5.4];
 
-      osc.type = i === 0 ? 'sine' : 'triangle';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      harmonics.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
-      const initialGain = 0.22 / (i + 1);
-      gain.gain.setValueAtTime(initialGain, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.2);
+        osc.type = i === 0 ? 'sine' : i === 1 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq, startTime);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+        const initialGain = 0.45 / (i + 1);
+        gain.gain.setValueAtTime(initialGain, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 2.4);
 
-      osc.start();
-      osc.stop(ctx.currentTime + 2.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(startTime);
+        osc.stop(startTime + 2.4);
+      });
     });
-  } catch {
-    // Ignore audio context errors
+  } catch (e) {
+    console.error('Failed to play transition bell:', e);
   }
 };
 
 export const playAudioChime = (type: 'start' | 'pause' | 'complete') => {
   if (typeof window === 'undefined') return;
   try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
     if (type === 'start') {
       const osc = ctx.createOscillator();
@@ -289,7 +325,7 @@ export const playAudioChime = (type: 'start' | 'pause' | 'complete') => {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(440, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -301,7 +337,7 @@ export const playAudioChime = (type: 'start' | 'pause' | 'complete') => {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(600, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.2);
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -312,19 +348,19 @@ export const playAudioChime = (type: 'start' | 'pause' | 'complete') => {
       notes.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        const startTime = ctx.currentTime + idx * 0.12;
+        const startTime = ctx.currentTime + idx * 0.15;
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0.2, startTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+        gain.gain.setValueAtTime(0.35, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.5);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(startTime);
-        osc.stop(startTime + 0.4);
+        osc.stop(startTime + 0.5);
       });
     }
-  } catch {
-    // Ignore audio context errors
+  } catch (e) {
+    console.error('Failed to play audio chime:', e);
   }
 };
 
@@ -766,10 +802,12 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
     setHasSessionStarted(false);
 
-    if (settings.bellEnabled) {
-      const bellType = mode === 'work' ? 'focus_to_break' : 'break_to_focus';
-      playTransitionBell(bellType);
-    } else if (settings.soundEnabled) {
+    unlockAudioContext();
+
+    const bellType = mode === 'work' ? 'focus_to_break' : 'break_to_focus';
+    playTransitionBell(bellType);
+
+    if (settings.soundEnabled && !settings.bellEnabled) {
       playAudioChime('complete');
     }
 
@@ -1027,7 +1065,27 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
   }, [ambientVolume]);
 
+  // Auto-unlock Web Audio Context on any user click or keypress so transition bell rings hands-free
+  useEffect(() => {
+    const handleGesture = () => {
+      unlockAudioContext();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('click', handleGesture, { passive: true });
+      window.addEventListener('pointerdown', handleGesture, { passive: true });
+      window.addEventListener('keydown', handleGesture, { passive: true });
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('click', handleGesture);
+        window.removeEventListener('pointerdown', handleGesture);
+        window.removeEventListener('keydown', handleGesture);
+      }
+    };
+  }, []);
+
   const togglePlay = () => {
+    unlockAudioContext();
     lastLocalActionTimeRef.current = Date.now();
     if (!isRunning) {
       if (settings.soundEnabled) playAudioChime('start');
