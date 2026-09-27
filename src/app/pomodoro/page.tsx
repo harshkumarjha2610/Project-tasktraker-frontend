@@ -734,7 +734,9 @@ export default function PomodoroPage() {
                   textTransform: 'uppercase',
                   letterSpacing: '0.12em'
                 }}>
-                  {overdueBreakMode
+                  {overdueBreakMode === 'work'
+                    ? 'Delayed Break Start'
+                    : overdueBreakMode
                     ? 'Break Overdue Delay'
                     : isInterrupted
                     ? `${getModeTitle(mode)} Interrupted`
@@ -804,7 +806,7 @@ export default function PomodoroPage() {
                 ) : isInterrupted ? (
                   <>
                     <AlertTriangle size={14} color="#ef4444" />
-                    <span>{overdueBreakMode ? 'Overdue Return!' : 'Paused Mid-Session'}</span>
+                    <span>{overdueBreakMode === 'work' ? 'Overdue Break Start!' : overdueBreakMode ? 'Overdue Return!' : 'Paused Mid-Session'}</span>
                   </>
                 ) : (
                   <span>Click Start</span>
@@ -861,6 +863,8 @@ export default function PomodoroPage() {
               <span>
                 {isRunning
                   ? 'Pause Flow'
+                  : overdueBreakMode === 'work'
+                  ? 'Start Break Flow'
                   : overdueBreakMode
                   ? 'Resume Focus Now!'
                   : isInterrupted
@@ -918,12 +922,16 @@ export default function PomodoroPage() {
               </div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#ef4444' }}>
-                  {overdueBreakMode
+                  {overdueBreakMode === 'work'
+                    ? 'POMODORO COMPLETED! DELAYED BREAK START'
+                    : overdueBreakMode
                     ? `${(overdueBreakMode === 'shortBreak' ? 'SHORT BREAK' : 'LONG BREAK')} ENDED! OVERDUE FOCUS RETURN`
                     : `${getModeTitle(mode).toUpperCase()} INTERRUPTED! TIME WASTE TICKER ACTIVE`}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '1px 0 0' }}>
-                  {overdueBreakMode
+                  {overdueBreakMode === 'work'
+                    ? 'Pomodoro completed! You haven\'t started your break yet. Time waste ticker is calculating lost delay until you click "Start Break Flow".'
+                    : overdueBreakMode
                     ? 'Your break completed and you forgot to start the focus session. Time waste ticker is active until you click "Resume Focus Now!".'
                     : 'You stopped mid-session. Wasted time is being calculated and logged to Time Waste module.'}
                 </div>

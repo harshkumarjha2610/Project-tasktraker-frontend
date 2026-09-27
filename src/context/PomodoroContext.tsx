@@ -630,7 +630,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     const endTimeISO = new Date(now).toISOString();
 
     const modeLabel = overdueFromMode
-      ? `Overdue Focus Start (Delayed return after ${overdueFromMode === 'shortBreak' ? 'Short Break' : 'Long Break'})`
+      ? (overdueFromMode === 'work'
+          ? `Delayed Break Start (Overdue break after Pomodoro completion)`
+          : `Overdue Focus Start (Delayed return after ${overdueFromMode === 'shortBreak' ? 'Short Break' : 'Long Break'})`)
       : currentMode === 'work'
       ? (taskTitle ? `Interrupted Pomodoro ("${taskTitle}")` : `Interrupted Pomodoro Focus Session`)
       : currentMode === 'shortBreak'
@@ -817,6 +819,25 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       const isLongBreak = newCount % settings.longBreakInterval === 0;
       const nextMode: TimerMode = isLongBreak ? 'longBreak' : 'shortBreak';
       switchMode(nextMode, settings.autoStartBreaks);
+
+      if (!settings.autoStartBreaks) {
+        const now = Date.now();
+        setIsInterrupted(true);
+        setOverdueBreakMode('work');
+        interruptedStartedAtRef.current = now;
+        setWastedSeconds(0);
+        updateActiveTimerState({
+          isRunning: false,
+          mode: nextMode,
+          targetEndTimestamp: null,
+          timeLeft: getModeDurationSeconds(nextMode),
+          selectedTaskId,
+          isInterrupted: true,
+          wastedSeconds: 0,
+          interruptedStartedAt: now,
+          overdueBreakMode: 'work',
+        }).catch(() => {});
+      }
     } else {
       const finishedBreak = mode;
       switchMode('work', settings.autoStartPomodoros);
@@ -891,7 +912,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         ? `${wHours}h ${wMins}m ${wSecs}s`
         : `${wMins.toString().padStart(2, '0')}:${wSecs.toString().padStart(2, '0')}`;
 
-      if (overdueBreakMode) {
+      if (overdueBreakMode === 'work') {
+        document.title = `🚨 (${wFormatted} Wasted) Overdue Break Start - DailyTask`;
+      } else if (overdueBreakMode) {
         document.title = `🚨 (${wFormatted} Wasted) Overdue Focus Return - DailyTask`;
       } else {
         document.title = `⚠️ (${wFormatted} Wasted) ${modeName} Interrupted - DailyTask`;
