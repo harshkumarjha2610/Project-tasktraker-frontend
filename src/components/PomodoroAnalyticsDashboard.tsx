@@ -125,33 +125,51 @@ export default function PomodoroAnalyticsDashboard({
       return { hour: label, focusMins: hMins, sessions: hSessions.length };
     });
 
-    // Timeline of all activity on this day
+    // Timeline of all activity on this day with precise start and end times
     const timeline = [
-      ...daySessions.map(s => ({
-        id: s.id,
-        type: 'session' as const,
-        mode: s.mode,
-        title: s.taskTitle || 'Focus Session',
-        durationSecs: s.durationMinutes * 60,
-        timestamp: s.completedAt,
-      })),
-      ...dayBreaks.map(b => ({
-        id: b.id,
-        type: 'break' as const,
-        mode: b.mode,
-        title: b.mode === 'shortBreak' ? 'Short Break' : 'Long Break',
-        durationSecs: b.durationMinutes * 60,
-        timestamp: b.completedAt,
-      })),
-      ...dayWaste.map(w => ({
-        id: w.id,
-        type: 'waste' as const,
-        mode: w.mode,
-        title: w.isOverdueDelay ? 'Overdue Return Delay' : (w.taskTitle ? `Interrupted: "${w.taskTitle}"` : 'Interrupted Session'),
-        durationSecs: w.durationSeconds,
-        timestamp: w.interruptedAt,
-      })),
-    ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      ...daySessions.map(s => {
+        const endMs = new Date(s.completedAt).getTime();
+        const startMs = endMs - s.durationMinutes * 60 * 1000;
+        return {
+          id: s.id,
+          type: 'session' as const,
+          mode: s.mode,
+          title: s.taskTitle || 'Focus Session',
+          durationSecs: s.durationMinutes * 60,
+          timestamp: s.completedAt,
+          startMs,
+          endMs,
+        };
+      }),
+      ...dayBreaks.map(b => {
+        const endMs = new Date(b.completedAt).getTime();
+        const startMs = endMs - b.durationMinutes * 60 * 1000;
+        return {
+          id: b.id,
+          type: 'break' as const,
+          mode: b.mode,
+          title: b.mode === 'shortBreak' ? 'Short Break' : 'Long Break',
+          durationSecs: b.durationMinutes * 60,
+          timestamp: b.completedAt,
+          startMs,
+          endMs,
+        };
+      }),
+      ...dayWaste.map(w => {
+        const endMs = new Date(w.interruptedAt).getTime();
+        const startMs = endMs - w.durationSeconds * 1000;
+        return {
+          id: w.id,
+          type: 'waste' as const,
+          mode: w.mode,
+          title: w.isOverdueDelay ? 'Overdue Return Delay' : (w.taskTitle ? `Interrupted: "${w.taskTitle}"` : 'Interrupted Session'),
+          durationSecs: w.durationSeconds,
+          timestamp: w.interruptedAt,
+          startMs,
+          endMs,
+        };
+      }),
+    ].sort((a, b) => a.startMs - b.startMs);
 
     return {
       daySessions,
@@ -1467,7 +1485,8 @@ export default function PomodoroAnalyticsDashboard({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {dayAnalysis.timeline.map((item) => {
-              const timeStr = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const startTimeStr = new Date(item.startMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const endTimeStr = new Date(item.endMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               const isSession = item.type === 'session';
               const isBreak = item.type === 'break';
               const isWaste = item.type === 'waste';
@@ -1499,8 +1518,20 @@ export default function PomodoroAnalyticsDashboard({
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
                         {item.title}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {timeStr} • {isSession ? 'Focus Session' : isBreak ? 'Break Session' : 'Interrupted / Delay'}
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                          fontFamily: 'Inter, monospace',
+                          fontSize: 11
+                        }}>
+                          🕒 Start: {startTimeStr} ➔ End: {endTimeStr}
+                        </span>
+                        <span>• {isSession ? 'Focus Session' : isBreak ? 'Break Session' : 'Interrupted / Delay'}</span>
                       </div>
                     </div>
                   </div>

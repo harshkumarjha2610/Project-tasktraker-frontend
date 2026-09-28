@@ -134,11 +134,23 @@ export default function PomodoroPage() {
   const currentLevel = Math.floor(xpEarned / 200) + 1;
   const xpInCurrentLevel = xpEarned % 200;
 
-  const formatItemTimestamp = (isoStr: string) => {
-    const d = new Date(isoStr);
-    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (historyFilter === 'today') return timeStr;
-    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+  const formatItemTimestamp = (isoStr: string, durationSecs?: number) => {
+    const endD = new Date(isoStr);
+    const endTimeStr = endD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (durationSecs && durationSecs > 0) {
+      const startMs = endD.getTime() - durationSecs * 1000;
+      const startD = new Date(startMs);
+      const startTimeStr = startD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      if (historyFilter === 'today') {
+        return `Start: ${startTimeStr} ➔ End: ${endTimeStr}`;
+      }
+      return `${startD.toLocaleDateString([], { month: 'short', day: 'numeric' })} • ${startTimeStr} ➔ ${endTimeStr}`;
+    }
+
+    if (historyFilter === 'today') return endTimeStr;
+    return `${endD.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${endTimeStr}`;
   };
 
   return (
@@ -1580,7 +1592,7 @@ export default function PomodoroPage() {
                           {s.taskTitle ? s.taskTitle : (s.mode === 'work' ? 'Focus Session' : s.mode === 'shortBreak' ? 'Short Break' : 'Long Break')}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {formatItemTimestamp(s.completedAt)}
+                          {formatItemTimestamp(s.completedAt, s.durationMinutes * 60)}
                         </div>
                       </div>
                     </div>
@@ -1662,7 +1674,7 @@ export default function PomodoroPage() {
                             : 'Interrupted Long Break'}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {formatItemTimestamp(w.interruptedAt)}
+                          {formatItemTimestamp(w.interruptedAt, w.durationSeconds)}
                         </div>
                       </div>
                     </div>
