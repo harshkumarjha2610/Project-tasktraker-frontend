@@ -467,6 +467,7 @@ interface PomodoroContextType {
   ambientVolume: number;
   setAmbientVolume: (vol: number) => void;
   quoteIndex: number;
+  setQuoteIndex: React.Dispatch<React.SetStateAction<number>>;
   notificationPermission: NotificationPermission;
   requestNotificationPermission: () => Promise<void>;
   formatSecsToMMSS: (sec: number) => string;
