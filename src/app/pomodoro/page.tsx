@@ -42,6 +42,7 @@ export default function PomodoroPage() {
     ambientSound, setAmbientSound,
     ambientVolume, setAmbientVolume,
     quoteIndex, setQuoteIndex,
+    notificationPermission, requestNotificationPermission,
     formatSecsToMMSS, formatSecsToHoursMins, getModeTitle, getModeDurationSeconds
   } = usePomodoroContext();
 
@@ -309,6 +310,50 @@ export default function PomodoroPage() {
               <span style={{ fontSize: 13 }}>Settings</span>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── 🔔 DESKTOP NOTIFICATIONS PERMISSION BANNER ──────────────── */}
+      {!zenMode && notificationPermission !== 'granted' && (
+        <div style={{
+          marginBottom: 20,
+          padding: '12px 18px',
+          borderRadius: 14,
+          background: 'linear-gradient(135deg, rgba(6, 186, 212, 0.12), rgba(59, 130, 246, 0.08))',
+          border: '1px solid rgba(6, 186, 212, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BellRing size={20} color="#06b6d4" />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                Enable Background Desktop Notifications &amp; Bell Alerts
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                Receive automatic bell rings and popup alerts even when working on other tabs or applications.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => requestNotificationPermission()}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 10,
+              background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 700,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(6, 186, 212, 0.3)'
+            }}
+          >
+            Allow Desktop Notifications
+          </button>
         </div>
       )}
 

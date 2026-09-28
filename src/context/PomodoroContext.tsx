@@ -269,9 +269,78 @@ export const playClockTickStyle = (style: ClockSoundStyle, isTock: boolean, volu
   }
 };
 
+// Synthesize a 1.8s PCM WAV bell chime Data URI for unthrottled background tab HTML5 Audio playback
+export const createBellAudioDataURI = (freq = 528, durationSecs = 1.8): string => {
+  const sampleRate = 22050;
+  const numSamples = Math.floor(sampleRate * durationSecs);
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const decay = Math.exp(-3.5 * t);
+    const sample = (
+      0.5 * Math.sin(2 * Math.PI * freq * t) +
+      0.3 * Math.sin(2 * Math.PI * freq * 2.01 * t) +
+      0.2 * Math.sin(2 * Math.PI * freq * 3.01 * t)
+    ) * decay;
+
+    const intSample = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
+    view.setInt16(44 + i * 2, intSample, true);
+  }
+
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return 'data:audio/wav;base64,' + btoa(binary);
+};
+
+let cachedBellDataURI: string | null = null;
+export const playHTML5BellFallback = (transition: 'focus_to_break' | 'break_to_focus') => {
+  if (typeof window === 'undefined') return;
+  try {
+    const freq = transition === 'focus_to_break' ? 528 : 432;
+    if (!cachedBellDataURI) {
+      cachedBellDataURI = createBellAudioDataURI(freq, 2.0);
+    }
+    const audio = new Audio(cachedBellDataURI);
+    audio.volume = 1.0;
+    audio.play().catch(() => {});
+  } catch {
+    // Ignore audio playback errors
+  }
+};
+
 // Web Audio Resonant Zen Temple Bell Ring Synthesizer
 export const playTransitionBell = (transition: 'focus_to_break' | 'break_to_focus') => {
   if (typeof window === 'undefined') return;
+
+  // 1. Play HTML5 Audio fallback (bypasses main thread background tab throttling)
+  playHTML5BellFallback(transition);
+
+  // 2. Play Web Audio 3-stroke temple bell chime
   try {
     const ctx = getSharedAudioContext();
     if (!ctx) return;
@@ -398,7 +467,8 @@ interface PomodoroContextType {
   ambientVolume: number;
   setAmbientVolume: (vol: number) => void;
   quoteIndex: number;
-  setQuoteIndex: React.Dispatch<React.SetStateAction<number>>;
+  notificationPermission: NotificationPermission;
+  requestNotificationPermission: () => Promise<void>;
   formatSecsToMMSS: (sec: number) => string;
   formatSecsToHoursMins: (sec: number) => string;
   formatSecsToHHMMSS: (sec: number) => string;
@@ -433,6 +503,24 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const [ambientSound, setAmbientSound] = useState<AmbientSoundType>('none');
   const [ambientVolume, setAmbientVolume] = useState<number>(0.3);
   const [quoteIndex, setQuoteIndex] = useState<number>(0);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const res = await Notification.requestPermission();
+        setNotificationPermission(res);
+      } catch (e) {
+        console.error('Failed to request notification permission:', e);
+      }
+    }
+  }, []);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ambientGainNodeRef = useRef<GainNode | null>(null);
@@ -811,12 +899,29 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       playAudioChime('complete');
     }
 
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      const title = mode === 'work' ? '🔔 Focus Session Bell Ring! +50 XP' : '🔔 Break Over Bell Ring!';
-      const body = mode === 'work'
-        ? 'Great work! Take a break to recharge.'
-        : 'Break is over! Time to jump back into your focus flow!';
-      new Notification(title, { body, icon: '/favicon.ico' });
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        const title = mode === 'work' ? '🔔 Focus Session Bell Ring! +50 XP' : '🔔 Break Over Bell Ring!';
+        const body = mode === 'work'
+          ? 'Great work! Take a break to recharge.'
+          : 'Break is over! Time to jump back into your focus flow!';
+        try {
+          const notification = new Notification(title, {
+            body,
+            icon: '/favicon.ico',
+            requireInteraction: true,
+            tag: 'pomodoro-complete-notification',
+          });
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
+        } catch (e) {
+          console.error('Failed to trigger notification:', e);
+        }
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
     }
 
     const linkedTask = tasks.find(t => t.id === selectedTaskId) || filteredTasks.find(t => t.id === selectedTaskId);
@@ -900,8 +1005,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, tasks, editTask, selectedTaskId, completedSessionsCount, switchMode, getModeDurationSeconds]);
 
-  // Global Timer Tick Interval
+  // Global Timer Tick Interval (Dual Web Worker + setInterval engine for background tab accuracy)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
     if (isRunning) {
@@ -909,7 +1015,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         targetEndTimestampRef.current = Date.now() + timeLeft * 1000;
       }
 
-      timerRef.current = setInterval(() => {
+      const onTick = () => {
         if (!targetEndTimestampRef.current) return;
         const remainingMs = targetEndTimestampRef.current - Date.now();
         const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -917,7 +1023,11 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         setTimeLeft(remainingSecs);
 
         if (remainingSecs <= 0) {
-          clearInterval(timerRef.current as NodeJS.Timeout);
+          if (timerRef.current) clearInterval(timerRef.current);
+          if (workerRef.current) {
+            workerRef.current.terminate();
+            workerRef.current = null;
+          }
           targetEndTimestampRef.current = null;
           handleSessionComplete();
         } else {
@@ -925,13 +1035,50 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
             playClockTickStyle(settings.clockStyle || 'classic', remainingSecs % 2 === 0, 0.08);
           }
         }
-      }, 1000);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
+      };
+
+      timerRef.current = setInterval(onTick, 1000);
+
+      // Web Worker ticker guarantees background tab execution when main thread is throttled by browser
+      if (typeof window !== 'undefined' && window.Worker) {
+        try {
+          const blob = new Blob([`
+            let interval = null;
+            self.onmessage = function(e) {
+              if (e.data === 'start') {
+                if (interval) clearInterval(interval);
+                interval = setInterval(function() { self.postMessage('tick'); }, 1000);
+              } else if (e.data === 'stop') {
+                if (interval) clearInterval(interval);
+              }
+            };
+          `], { type: 'application/javascript' });
+          const worker = new Worker(URL.createObjectURL(blob));
+          worker.onmessage = (e) => {
+            if (e.data === 'tick') {
+              onTick();
+            }
+          };
+          worker.postMessage('start');
+          workerRef.current = worker;
+        } catch {
+          // ignore worker errors
+        }
+      }
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
     }
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
     };
   }, [isRunning, handleSessionComplete, settings.soundEnabled, settings.tickingEnabled, settings.clockStyle, ambientSound]);
 
@@ -1272,6 +1419,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       ambientSound, setAmbientSound,
       ambientVolume, setAmbientVolume,
       quoteIndex, setQuoteIndex,
+      notificationPermission, requestNotificationPermission,
       formatSecsToMMSS, formatSecsToHoursMins, formatSecsToHHMMSS,
       getModeTitle, getModeDurationSeconds
     }}>
