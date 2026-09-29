@@ -303,6 +303,34 @@ export default function PomodoroPage() {
               <span style={{ fontSize: 13 }}>{settings.bellEnabled ? 'Zen Bell On' : 'Bell Off'}</span>
             </button>
 
+            {/* Auto-Run Toggle Button */}
+            <button
+              onClick={() => {
+                const newAuto = !settings.autoRunPomodoro;
+                saveSettings({
+                  ...settings,
+                  autoRunPomodoro: newAuto,
+                  autoStartBreaks: newAuto ? true : settings.autoStartBreaks,
+                  autoStartPomodoros: newAuto ? true : settings.autoStartPomodoros,
+                });
+              }}
+              className="btn btn-secondary"
+              style={{
+                padding: '8px 14px',
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: settings.autoRunPomodoro ? 'rgba(16, 185, 129, 0.15)' : undefined,
+                borderColor: settings.autoRunPomodoro ? 'rgba(16, 185, 129, 0.4)' : undefined,
+                color: settings.autoRunPomodoro ? '#10b981' : 'var(--text-secondary)'
+              }}
+              title={settings.autoRunPomodoro ? 'Disable Automatic Running Mode' : 'Enable Automatic Running of Pomodoro (Runs continuous cycles automatically)'}
+            >
+              <Zap size={17} />
+              <span style={{ fontSize: 13 }}>{settings.autoRunPomodoro ? 'Auto-Run On' : 'Auto-Run Off'}</span>
+            </button>
+
             <button
               onClick={() => setZenMode(true)}
               className="btn btn-secondary"
@@ -625,7 +653,25 @@ export default function PomodoroPage() {
           zIndex: 2
         }}>
           {/* Main Tabs */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+            {settings.autoRunPomodoro && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 14px',
+                borderRadius: 20,
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                color: '#10b981',
+                fontSize: 12,
+                fontWeight: 700,
+                boxShadow: '0 2px 10px rgba(16, 185, 129, 0.2)'
+              }} title="Automatic Running Mode is enabled. Timers loop continuously without stopping.">
+                <Zap size={14} />
+                <span>AUTO-RUN ACTIVE</span>
+              </div>
+            )}
             {[
               { key: 'work', label: 'Focus Mode', minutes: settings.workDuration },
               { key: 'shortBreak', label: 'Short Break', minutes: settings.shortBreakDuration },
@@ -1966,6 +2012,42 @@ export default function PomodoroPage() {
                     fontSize: 14
                   }}
                 />
+              </div>
+
+              {/* Automatic Running of Pomodoro Toggle Card */}
+              <div style={{
+                padding: '14px 16px',
+                borderRadius: 14,
+                background: settings.autoRunPomodoro ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-secondary)',
+                border: settings.autoRunPomodoro ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid var(--border)',
+                transition: 'all 0.2s ease',
+                marginTop: 4
+              }}>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Zap size={16} color={settings.autoRunPomodoro ? '#10b981' : 'var(--accent)'} />
+                      <span>Automatic Running of Pomodoro</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.3 }}>
+                      When enabled, Pomodoros and Breaks will run continuously in an automatic seamless loop.
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={!!settings.autoRunPomodoro}
+                    onChange={e => {
+                      const isAuto = e.target.checked;
+                      saveSettings({
+                        ...settings,
+                        autoRunPomodoro: isAuto,
+                        autoStartBreaks: isAuto ? true : settings.autoStartBreaks,
+                        autoStartPomodoros: isAuto ? true : settings.autoStartPomodoros,
+                      });
+                    }}
+                    style={{ accentColor: '#10b981', width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }}
+                  />
+                </label>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>

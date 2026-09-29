@@ -136,6 +136,7 @@ export interface PomodoroBackendData {
     longBreakInterval: number;
     autoStartBreaks: boolean;
     autoStartPomodoros: boolean;
+    autoRunPomodoro?: boolean;
     soundEnabled: boolean;
     tickingEnabled: boolean;
     bellEnabled: boolean;

@@ -34,6 +34,7 @@ export interface TimerSettings {
   longBreakInterval: number;
   autoStartBreaks: boolean;
   autoStartPomodoros: boolean;
+  autoRunPomodoro: boolean;
   soundEnabled: boolean;
   tickingEnabled: boolean;
   bellEnabled: boolean;
@@ -64,6 +65,7 @@ export const DEFAULT_SETTINGS: TimerSettings = {
   longBreakInterval: 4,
   autoStartBreaks: false,
   autoStartPomodoros: false,
+  autoRunPomodoro: false,
   soundEnabled: true,
   tickingEnabled: true,
   bellEnabled: true,
@@ -962,9 +964,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
       const isLongBreak = newCount % settings.longBreakInterval === 0;
       const nextMode: TimerMode = isLongBreak ? 'longBreak' : 'shortBreak';
-      switchMode(nextMode, settings.autoStartBreaks);
+      const autoStartBreak = settings.autoRunPomodoro || settings.autoStartBreaks;
+      switchMode(nextMode, autoStartBreak);
 
-      if (!settings.autoStartBreaks) {
+      if (!autoStartBreak) {
         const now = Date.now();
         setIsInterrupted(true);
         setOverdueBreakMode('work');
@@ -984,9 +987,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       const finishedBreak = mode;
-      switchMode('work', settings.autoStartPomodoros);
+      const autoStartPomodoro = settings.autoRunPomodoro || settings.autoStartPomodoros;
+      switchMode('work', autoStartPomodoro);
 
-      if (!settings.autoStartPomodoros) {
+      if (!autoStartPomodoro) {
         const now = Date.now();
         setIsInterrupted(true);
         setOverdueBreakMode(finishedBreak);
@@ -1005,6 +1009,27 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, tasks, editTask, selectedTaskId, completedSessionsCount, switchMode, getModeDurationSeconds]);
+
+  // Automatic running trigger when autoRunPomodoro setting is active and timer is currently stopped/idle
+  useEffect(() => {
+    if (settings.autoRunPomodoro && !isRunning && !isInterrupted && !hasSessionStarted && timeLeft > 0) {
+      const targetEnd = Date.now() + timeLeft * 1000;
+      targetEndTimestampRef.current = targetEnd;
+      setIsRunning(true);
+      setHasSessionStarted(true);
+      updateActiveTimerState({
+        isRunning: true,
+        mode,
+        targetEndTimestamp: targetEnd,
+        timeLeft,
+        selectedTaskId,
+        isInterrupted: false,
+        wastedSeconds: 0,
+        interruptedStartedAt: null,
+        overdueBreakMode: null,
+      }).catch(() => {});
+    }
+  }, [settings.autoRunPomodoro, isRunning, isInterrupted, hasSessionStarted, timeLeft, mode, selectedTaskId]);
 
   // Global Timer Tick Interval (Dual Web Worker + setInterval engine for background tab accuracy)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
