@@ -491,6 +491,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<TimerMode>('work');
   const [timeLeft, setTimeLeft] = useState<number>(DEFAULT_SETTINGS.workDuration * 60);
   const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [timerCycleId, setTimerCycleId] = useState<number>(0);
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [completedSessionsCount, setCompletedSessionsCount] = useState<number>(0);
   const [history, setHistory] = useState<PomodoroSession[]>([]);
@@ -629,15 +630,17 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Normal application of backend data
-      if (backendData.settings) {
-        setSettings({ ...DEFAULT_SETTINGS, ...backendData.settings } as TimerSettings);
-      }
-      if (backendData.colorTheme && THEME_PALETTES[backendData.colorTheme as PomodoroThemeColor]) {
-        setColorTheme(syncedTheme => syncedTheme || backendData.colorTheme as PomodoroThemeColor);
-      }
-      if (backendData.bgStyle && BG_STYLES[backendData.bgStyle as PomodoroBgStyle]) {
-        setBgStyle(syncedBg => syncedBg || backendData.bgStyle as PomodoroBgStyle);
+      // Normal application of backend data (guarded by recent local user interaction)
+      if (Date.now() - lastLocalActionTimeRef.current > 2500) {
+        if (backendData.settings) {
+          setSettings({ ...DEFAULT_SETTINGS, ...backendData.settings } as TimerSettings);
+        }
+        if (backendData.colorTheme && THEME_PALETTES[backendData.colorTheme as PomodoroThemeColor]) {
+          setColorTheme(syncedTheme => syncedTheme || backendData.colorTheme as PomodoroThemeColor);
+        }
+        if (backendData.bgStyle && BG_STYLES[backendData.bgStyle as PomodoroBgStyle]) {
+          setBgStyle(syncedBg => syncedBg || backendData.bgStyle as PomodoroBgStyle);
+        }
       }
       if (Array.isArray(backendData.history)) {
         setHistory(backendData.history as PomodoroSession[]);
@@ -851,6 +854,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     if (autoStart) {
       const targetEnd = Date.now() + newSecs * 1000;
       targetEndTimestampRef.current = targetEnd;
+      setTimerCycleId(prev => prev + 1);
       setIsRunning(true);
       interruptedStartedAtRef.current = null;
       updateActiveTimerState({
@@ -1015,6 +1019,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     if (settings.autoRunPomodoro && !isRunning && !isInterrupted && !hasSessionStarted && timeLeft > 0) {
       const targetEnd = Date.now() + timeLeft * 1000;
       targetEndTimestampRef.current = targetEnd;
+      setTimerCycleId(prev => prev + 1);
       setIsRunning(true);
       setHasSessionStarted(true);
       updateActiveTimerState({
@@ -1106,7 +1111,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         workerRef.current = null;
       }
     };
-  }, [isRunning, handleSessionComplete, settings.soundEnabled, settings.tickingEnabled, settings.clockStyle, ambientSound]);
+  }, [isRunning, timerCycleId, handleSessionComplete, settings.soundEnabled, settings.tickingEnabled, settings.clockStyle, ambientSound]);
 
   // Update Document Title Globally
   useEffect(() => {
@@ -1273,6 +1278,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       }
       const targetEnd = Date.now() + timeLeft * 1000;
       targetEndTimestampRef.current = targetEnd;
+      setTimerCycleId(prev => prev + 1);
       setIsRunning(true);
       updateActiveTimerState({
         isRunning: true,
@@ -1383,6 +1389,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveSettings = (newSettings: TimerSettings) => {
+    lastLocalActionTimeRef.current = Date.now();
     setSettings(newSettings);
     if (!isRunning) {
       setTimeLeft(getModeDurationSeconds(mode, newSettings));
