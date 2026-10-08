@@ -63,9 +63,9 @@ export const DEFAULT_SETTINGS: TimerSettings = {
   shortBreakDuration: 5,
   longBreakDuration: 15,
   longBreakInterval: 4,
-  autoStartBreaks: false,
-  autoStartPomodoros: false,
-  autoRunPomodoro: false,
+  autoStartBreaks: true,
+  autoStartPomodoros: true,
+  autoRunPomodoro: true,
   soundEnabled: true,
   tickingEnabled: true,
   bellEnabled: true,
@@ -633,7 +633,15 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       // Normal application of backend data (guarded by recent local user interaction)
       if (Date.now() - lastLocalActionTimeRef.current > 2500) {
         if (backendData.settings) {
-          setSettings({ ...DEFAULT_SETTINGS, ...backendData.settings } as TimerSettings);
+          const mergedSettings: TimerSettings = {
+            ...DEFAULT_SETTINGS,
+            ...backendData.settings,
+            clockStyle: (backendData.settings.clockStyle as ClockSoundStyle) || 'classic',
+            autoStartBreaks: backendData.settings.autoStartBreaks ?? true,
+            autoStartPomodoros: backendData.settings.autoStartPomodoros ?? true,
+            autoRunPomodoro: backendData.settings.autoRunPomodoro ?? true,
+          };
+          setSettings(mergedSettings);
         }
         if (backendData.colorTheme && THEME_PALETTES[backendData.colorTheme as PomodoroThemeColor]) {
           setColorTheme(syncedTheme => syncedTheme || backendData.colorTheme as PomodoroThemeColor);
@@ -694,10 +702,13 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
             setIsRunning(false);
           }
         } else {
-          targetEndTimestampRef.current = null;
-          setIsRunning(false);
-          if (typeof at.timeLeft === 'number' && at.timeLeft >= 0) {
-            setTimeLeft(at.timeLeft);
+          const isLocallyRunning = isRunning && targetEndTimestampRef.current && targetEndTimestampRef.current > Date.now();
+          if (!isLocallyRunning) {
+            targetEndTimestampRef.current = null;
+            setIsRunning(false);
+            if (typeof at.timeLeft === 'number' && at.timeLeft >= 0) {
+              setTimeLeft(at.timeLeft);
+            }
           }
         }
       }
@@ -856,6 +867,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       targetEndTimestampRef.current = targetEnd;
       setTimerCycleId(prev => prev + 1);
       setIsRunning(true);
+      setHasSessionStarted(true);
       interruptedStartedAtRef.current = null;
       updateActiveTimerState({
         isRunning: true,
