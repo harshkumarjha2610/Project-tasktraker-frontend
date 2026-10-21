@@ -534,6 +534,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const targetEndTimestampRef = useRef<number | null>(null);
   const lastLocalActionTimeRef = useRef<number>(0);
   const interruptedStartedAtRef = useRef<number | null>(null);
+  const handleSessionCompleteRef = useRef<() => void>(() => {});
 
   // Mode durations in seconds
   const getModeDurationSeconds = useCallback((m: TimerMode, customSettings = settings) => {
@@ -631,7 +632,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Normal application of backend data (guarded by recent local user interaction)
-      if (Date.now() - lastLocalActionTimeRef.current > 2500) {
+      if (Date.now() - lastLocalActionTimeRef.current > 4000) {
         if (backendData.settings) {
           const mergedSettings: TimerSettings = {
             ...DEFAULT_SETTINGS,
@@ -659,7 +660,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       recalculateDailyStats((backendData.history || []) as PomodoroSession[], (backendData.wasteHistory || []) as WastedSessionRecord[]);
 
       // Real-time active timer synchronization across devices & browsers
-      if (backendData.activeTimer && Date.now() - lastLocalActionTimeRef.current > 2500) {
+      if (backendData.activeTimer && Date.now() - lastLocalActionTimeRef.current > 4000) {
         const at = backendData.activeTimer;
 
         if (at.mode && ['work', 'shortBreak', 'longBreak'].includes(at.mode)) {
@@ -697,9 +698,17 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
             targetEndTimestampRef.current = at.targetEndTimestamp;
             setIsRunning(true);
           } else {
-            setTimeLeft(0);
+            // Target elapsed while in background or during sync interval
+            const elapsedSinceEnd = now - at.targetEndTimestamp;
             targetEndTimestampRef.current = null;
-            setIsRunning(false);
+            if (elapsedSinceEnd < 2 * 60 * 60 * 1000) {
+              // Session just finished recently - cleanly trigger auto completion and next cycle
+              handleSessionCompleteRef.current();
+            } else {
+              // Stale session from hours ago - reset gracefully
+              setIsRunning(false);
+              setTimeLeft(getModeDurationSeconds((at.mode as TimerMode) || 'work'));
+            }
           }
         } else {
           const isLocallyRunning = isRunning && targetEndTimestampRef.current && targetEndTimestampRef.current > Date.now();
@@ -1026,27 +1035,35 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isInterrupted, wastedSeconds, mode, activeTask, overdueBreakMode, saveInterruptedWasteSession, settings, filteredTasks, tasks, editTask, selectedTaskId, completedSessionsCount, switchMode, getModeDurationSeconds]);
 
+  // Keep ref up to date so background poll sync can trigger completion seamlessly
+  handleSessionCompleteRef.current = handleSessionComplete;
+
   // Automatic running trigger when autoRunPomodoro setting is active and timer is currently stopped/idle
   useEffect(() => {
-    if (settings.autoRunPomodoro && !isRunning && !isInterrupted && !hasSessionStarted && timeLeft > 0) {
-      const targetEnd = Date.now() + timeLeft * 1000;
-      targetEndTimestampRef.current = targetEnd;
-      setTimerCycleId(prev => prev + 1);
-      setIsRunning(true);
-      setHasSessionStarted(true);
-      updateActiveTimerState({
-        isRunning: true,
-        mode,
-        targetEndTimestamp: targetEnd,
-        timeLeft,
-        selectedTaskId,
-        isInterrupted: false,
-        wastedSeconds: 0,
-        interruptedStartedAt: null,
-        overdueBreakMode: null,
-      }).catch(() => {});
+    if (settings.autoRunPomodoro && !isRunning && !isInterrupted) {
+      const effectiveSecs = timeLeft > 0 ? timeLeft : getModeDurationSeconds(mode);
+      if (!hasSessionStarted || timeLeft <= 0) {
+        setTimeLeft(effectiveSecs);
+        const targetEnd = Date.now() + effectiveSecs * 1000;
+        targetEndTimestampRef.current = targetEnd;
+        lastLocalActionTimeRef.current = Date.now();
+        setTimerCycleId(prev => prev + 1);
+        setIsRunning(true);
+        setHasSessionStarted(true);
+        updateActiveTimerState({
+          isRunning: true,
+          mode,
+          targetEndTimestamp: targetEnd,
+          timeLeft: effectiveSecs,
+          selectedTaskId,
+          isInterrupted: false,
+          wastedSeconds: 0,
+          interruptedStartedAt: null,
+          overdueBreakMode: null,
+        }).catch(() => {});
+      }
     }
-  }, [settings.autoRunPomodoro, isRunning, isInterrupted, hasSessionStarted, timeLeft, mode, selectedTaskId]);
+  }, [settings.autoRunPomodoro, isRunning, isInterrupted, hasSessionStarted, timeLeft, mode, selectedTaskId, getModeDurationSeconds]);
 
   // Global Timer Tick Interval (Dual Web Worker + setInterval engine for background tab accuracy)
   const timerRef = useRef<NodeJS.Timeout | null>(null);
